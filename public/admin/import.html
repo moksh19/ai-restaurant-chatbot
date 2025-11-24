@@ -36,12 +36,13 @@
 let importedMenu = null;
 
 async function importMenu() {
+  const restaurantId = document.getElementById("restaurantId").value;
   const url = document.getElementById("url").value;
 
   const res = await fetch("/import-from-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url })   // <— important: key name is "url"
+    body: JSON.stringify({ restaurantId, url })
   });
 
   const data = await res.json();
@@ -58,6 +59,7 @@ async function importMenu() {
 
   document.getElementById("saveBtn").classList.remove("hidden");
 }
+
 
 
 async function saveMenu() {
