@@ -1,81 +1,82 @@
-{
-  "pizza-pints": {
+[
+  {
     "id": "pizza-pints",
-    "name": "Pizza & Pints",
-    "address": "2320 Bale St Suite 114, Raleigh, NC 27608",
-    "hours": "Tuesday–Sunday, 11:00 AM – 10:00 PM. Closed Mondays.",
-    "phone": "(919) 123-4567",
-    "orderingLink": "https://your-ordering-link-here.com",
-    "googleReviewLink": "https://your-google-review-link-here.com",
-    "offers": [
-      "Any Signature/Specialty 10” pizza $10.89",
-      "Any 14” pizza $14.99 – use code HOLIDAYS for online orders"
-    ],
     "menu": [
       {
-        "category": "Pizzas",
+        "category": "Build Your Own Pizza",
         "items": [
           {
-            "name": "Margherita",
-            "price": "$14.99",
-            "notes": "Fresh mozzarella, basil, tomato sauce"
+            "name": "2-Topping Pizza",
+            "price": "$13.95",
+            "notes": ""
           },
           {
-            "name": "Pepperoni Feast",
-            "price": "$16.99",
-            "notes": "Loaded with pepperoni & extra cheese"
-          }
-        ]
-      }
-    ],
-    "faq": [
-      "We offer vegetarian options like Margherita and Veggie Delight.",
-      "Gluten-free crust available for 10\" pizzas.",
-      "We offer both pickup and delivery via our online ordering link."
-    ]
-  },
-  "bombay-bites": {
-    "id": "bombay-bites",
-    "name": "Bombay Bites",
-    "address": "123 Curry St, Raleigh, NC",
-    "hours": "Every day 11 AM – 10 PM",
-    "phone": "(919) 555-8888",
-    "orderingLink": "https://bombaybites.com/order",
-    "googleReviewLink": "https://g.page/r/xxxx",
-    "offers": [
-      "Lunch thali from $9.99",
-      "Weekend buffet available 12–3 PM"
-    ],
-    "menu": [
-      {
-        "category": "Starters",
-        "items": [
+            "name": "4-Topping Pizza",
+            "price": "$15.95",
+            "notes": ""
+          },
           {
-            "name": "Samosa",
-            "price": "$4.99",
-            "notes": "2 pcs, potato & peas"
+            "name": "7-Topping Pizza",
+            "price": "$17.95",
+            "notes": ""
           }
         ]
       },
       {
-        "category": "Curries",
+        "category": "Signature Pizzas",
         "items": [
           {
-            "name": "Butter Chicken",
-            "price": "$14.99",
-            "notes": "Creamy tomato gravy"
+            "name": "Veggie Lovers",
+            "price": "$14.95",
+            "notes": "Marinara, Shredded Mozzarella, Bellpepper, Olives, Mushroom, Onion"
           },
           {
-            "name": "Palak Paneer",
-            "price": "$13.99",
-            "notes": "Spinach & cottage cheese"
+            "name": "Four Cheese",
+            "price": "$14.95",
+            "notes": "Parmesan, Shredded Mozzarella, Ricotta, Cheddar"
+          },
+          {
+            "name": "Pepperoni",
+            "price": "$12.95",
+            "notes": "Marinara, mozzarella, Pepperoni"
+          },
+          {
+            "name": "Meat Lovers",
+            "price": "$14.95",
+            "notes": "Marinara, Shredded Mozzarella, Pepperoni, sausage"
+          },
+          {
+            "name": "Cheese Pizza",
+            "price": "$12.95",
+            "notes": "Mozzarella Cheese, Marinara"
+          },
+          {
+            "name": "Margherita",
+            "price": "$13.95",
+            "notes": "Mozzarella, Tomato, Marinara, Basil"
+          },
+          {
+            "name": "BBQ Chicken",
+            "price": "$14.95",
+            "notes": "BBQ Sauce, Mozzarella, Chicken, Bacon, BBQ and Ranch Drizzle"
+          },
+          {
+            "name": "Buffalo Chicken",
+            "price": "$14.95",
+            "notes": "Buffalo Sauce, Mozzarella, Buffalo chicken, caramelized onions, cheddar cheese, buffalo & ranch drizzle"
+          },
+          {
+            "name": "Supreme",
+            "price": "$15.95",
+            "notes": "Marinara, Mozzarella, pepperoni, sausage, onions, green peppers, black olives"
+          },
+          {
+            "name": "Hawaiian hurricane",
+            "price": "$14.95",
+            "notes": "marinara, mozzarella, ham, bacon, pineapple"
           }
         ]
       }
-    ],
-    "faq": [
-      "We have vegetarian and vegan options.",
-      "We can make most dishes mild, medium, or spicy."
     ]
   }
-}
+]
