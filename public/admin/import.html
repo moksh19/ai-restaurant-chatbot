@@ -44,16 +44,9 @@
   </a>
 </div>
 
-
-
 <script>
 let importedMenu = null;
 
-
-
-// ----------------------------------------
-// IMPORT MENU FUNCTION
-// ----------------------------------------
 async function importMenu() {
   const restaurantId = document.getElementById("restaurantId").value;
   const url = document.getElementById("url").value;
@@ -87,11 +80,6 @@ async function importMenu() {
   document.getElementById("saveBtn").classList.remove("hidden");
 }
 
-
-
-// ----------------------------------------
-// SAVE IMPORTED MENU FUNCTION
-// ----------------------------------------
 async function saveImportedMenu() {
   const restaurantId = document.getElementById("restaurantId").value;
 
@@ -114,7 +102,6 @@ async function saveImportedMenu() {
     alert("Error saving the imported menu.");
   }
 }
-
 </script>
 
 </body>

@@ -2,10 +2,13 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs/promises";
 import OpenAI from "openai";
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+import { JSDOM } from "jsdom";
 
 dotenv.config();
 
@@ -13,96 +16,181 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// ---------- Middleware ----------
 app.use(cors());
 app.use(express.json());
 
-// --- Load restaurants.json ---
-const dataPath = path.join(__dirname, "restaurants.json");
+// Static files
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/admin", express.static(path.join(__dirname, "public/admin")));
 
-function loadRestaurants() {
-  const raw = fs.readFileSync(dataPath, "utf-8");
-  return JSON.parse(raw);
-}
-
-function saveRestaurants(restaurants) {
-  fs.writeFileSync(dataPath, JSON.stringify(restaurants, null, 2), "utf-8");
-}
-
-let restaurants = loadRestaurants();
-
-// --- OpenAI setup ---
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Build system context from restaurant data
-function buildRestaurantContext(restaurant) {
-  const menuText = (restaurant.menu || [])
-    .map(
-      (section) =>
-        `\n${section.category}:\n` +
-        section.items
-          .map(
-            (item) =>
-              `- ${item.name} (${item.price}) – ${item.notes ?? ""}`
-          )
-          .join("\n")
-    )
-    .join("\n");
+// ---------- Restaurants storage ----------
 
-  const offersText =
-    restaurant.offers && restaurant.offers.length
-      ? restaurant.offers.map((o) => `- ${o}`).join("\n")
-      : "No active offers listed.";
+const restaurantsFile = path.join(__dirname, "restaurants.json");
 
-  const faqText =
-    restaurant.faq && restaurant.faq.length
-      ? restaurant.faq.map((f) => `- ${f}`).join("\n")
-      : "No FAQ available.";
-
-  return `
-You are a friendly, concise chatbot for the restaurant "${restaurant.name}".
-
-ADDRESS:
-${restaurant.address}
-
-HOURS:
-${restaurant.hours}
-
-PHONE:
-${restaurant.phone ?? "Not provided"}
-
-ORDERING:
-Send customers to this link for online orders:
-${restaurant.orderingLink}
-
-GOOGLE REVIEWS:
-When appropriate, share this review link:
-${restaurant.googleReviewLink}
-
-CURRENT OFFERS:
-${offersText}
-
-MENU:
-${menuText}
-
-FAQ:
-${faqText}
-
-RULES:
-- Always answer ONLY using the information above when possible.
-- If you don't know something, say you're not sure and suggest calling the restaurant.
-- When customers ask to order, always give the ordering link.
-- When customers say they enjoyed, nicely encourage them to leave a Google review.
-- Be short, clear, and friendly.
-`;
+async function loadRestaurants() {
+  try {
+    const data = await fs.readFile(restaurantsFile, "utf8");
+    return JSON.parse(data);
+  } catch (err) {
+    console.error("Error loading restaurants.json, using empty object:", err.message);
+    return {};
+  }
 }
 
-// --- 1) Chat endpoint ---
+async function saveRestaurants(data) {
+  try {
+    await fs.writeFile(restaurantsFile, JSON.stringify(data, null, 2), "utf8");
+  } catch (err) {
+    console.error("Error saving restaurants.json:", err);
+  }
+}
+
+let restaurants = {};
+
+// ---------- Image upload (Cloudinary) ----------
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_KEY,
+  api_secret: process.env.CLOUD_SECRET,
+});
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post("/upload-image", upload.single("image"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+
+  const stream = cloudinary.uploader.upload_stream(
+    { folder: "restaurant-menu" },
+    (error, result) => {
+      if (error) {
+        console.error("Cloudinary error:", error);
+        return res.status(500).json({ error: "Upload failed" });
+      }
+      return res.json({ url: result.secure_url });
+    }
+  );
+
+  stream.end(req.file.buffer);
+});
+
+// ---------- Import menu from URL (preview only) ----------
+
+app.post("/import-from-url", async (req, res) => {
+  try {
+    const { restaurantId, url } = req.body || {};
+
+    if (!restaurantId || !url) {
+      return res
+        .status(400)
+        .json({ error: "restaurantId and url are required" });
+    }
+
+    const response = await fetch(url);
+    const html = await response.text();
+
+    const dom = new JSDOM(html);
+    const text = dom.window.document.body.textContent || "";
+
+    if (!text.trim()) {
+      return res
+        .status(500)
+        .json({ error: "No readable text found on page" });
+    }
+
+    const ai = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: `Extract a restaurant menu from this text and return ONLY valid JSON.
+
+Format:
+[
+  {
+    "category": "Category Name",
+    "items": [
+      { "name": "Item Name", "price": "$0.00", "notes": "" }
+    ]
+  }
+]
+
+Text:
+${text}`,
+        },
+      ],
+    });
+
+    const raw = ai.choices[0].message.content.trim();
+    const cleaned = raw
+      .replace(/^```json/i, "")
+      .replace(/^```/, "")
+      .replace(/```$/, "")
+      .trim();
+
+    let menuJson;
+    try {
+      menuJson = JSON.parse(cleaned);
+    } catch (err) {
+      console.error("JSON parse error on AI output:", cleaned);
+      return res.status(500).json({ error: "AI returned invalid JSON" });
+    }
+
+    // IMPORTANT: do NOT save here. Just preview.
+    return res.json({ menu: menuJson });
+  } catch (err) {
+    console.error("Import error:", err);
+    return res.status(500).json({ error: "Failed to import menu" });
+  }
+});
+
+// ---------- Restaurants CRUD ----------
+
+// Get list of restaurants
+app.get("/restaurants", (req, res) => {
+  const list = Object.values(restaurants || {}).map((r) => ({
+    id: r.id,
+    ...r,
+  }));
+  res.json(list);
+});
+
+// Create / update restaurant (merge)
+app.post("/restaurants/:id", async (req, res) => {
+  const id = req.params.id;
+  const body = req.body || {};
+
+  const existing = restaurants[id] || { id };
+
+  const newRestaurant = {
+    ...existing,
+    ...body,
+    id,
+    offers: body.offers ?? existing.offers ?? [],
+    menu: body.menu ?? existing.menu ?? [],
+    faq: body.faq ?? existing.faq ?? [],
+  };
+
+  restaurants[id] = newRestaurant;
+  await saveRestaurants(restaurants);
+
+  res.json(newRestaurant);
+});
+
+// ---------- Chat endpoint ----------
+
 app.post("/chat", async (req, res) => {
   try {
-    const { restaurantId, message, history } = req.body;
-
+    const { restaurantId, message, history } = req.body || {};
     if (!restaurantId || !message) {
       return res
         .status(400)
@@ -114,229 +202,63 @@ app.post("/chat", async (req, res) => {
       return res.status(404).json({ error: "Restaurant not found" });
     }
 
-    const systemPrompt = buildRestaurantContext(restaurant);
-    const historyMessages = Array.isArray(history) ? history : [];
+    const context = JSON.stringify(
+      {
+        name: restaurant.name,
+        address: restaurant.address,
+        phone: restaurant.phone,
+        hours: restaurant.hours,
+        orderingLink: restaurant.orderingLink,
+        googleReviewLink: restaurant.googleReviewLink,
+        offers: restaurant.offers,
+        menu: restaurant.menu,
+        faq: restaurant.faq,
+      },
+      null,
+      2
+    );
+
+    const systemPrompt = `
+You are a friendly, helpful AI chatbot for the restaurant "${restaurant.name}".
+
+Use ONLY this restaurant data to answer questions:
+
+${context}
+
+Rules:
+- If you're asked something not in the data (like exact delivery zones, prices, or unavailable info), say you aren't sure and suggest calling the restaurant.
+- Be concise and conversational.
+- When talking about menu items, mention category and price if available.
+`;
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...historyMessages,
+      ...(Array.isArray(history) ? history : []),
       { role: "user", content: message },
     ];
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       messages,
-      temperature: 0.4,
     });
 
     const reply = completion.choices[0].message.content;
     res.json({ reply });
   } catch (err) {
     console.error("Chat error:", err);
-    res.status(500).json({ error: "AI error" });
+    res.status(500).json({ error: "Chat failed" });
   }
 });
 
-// --- 2) CRUD for restaurants ---
+// ---------- Start server ----------
 
-// List all
-app.get("/restaurants", (req, res) => {
-  res.json(Object.values(restaurants));
-});
+async function start() {
+  restaurants = await loadRestaurants();
+  app.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+  });
+}
 
-// Get one
-app.get("/restaurants/:id", (req, res) => {
-  const r = restaurants[req.params.id];
-  if (!r) return res.status(404).json({ error: "Not found" });
-  res.json(r);
-});
-
-// Create / update (upsert)
-app.post("/restaurants/:id", (req, res) => {
-  const id = req.params.id;
-  const body = req.body;
-
-  const existing = restaurants[id] || { id };
-
-  // Merge existing data with new data (partial updates)
-  const newRestaurant = {
-    ...existing,
-    ...body,
-    id,
-    // Ensure arrays don't get accidentally set to undefined
-    offers: body.offers ?? existing.offers ?? [],
-    menu: body.menu ?? existing.menu ?? [],
-    faq: body.faq ?? existing.faq ?? [],
-  };
-
-  restaurants[id] = newRestaurant;
-  saveRestaurants(restaurants);
-
-  res.json(newRestaurant);
-});
-
-
-// Delete
-app.delete("/restaurants/:id", (req, res) => {
-  const id = req.params.id;
-  if (!restaurants[id]) {
-    return res.status(404).json({ error: "Not found" });
-  }
-  delete restaurants[id];
-  saveRestaurants(restaurants);
-  res.json({ success: true });
-});
-
-// --- 3) Optional: import from website URL ---
-app.post("/import-from-url", async (req, res) => {
-  try {
-    const { restaurantId, url } = req.body;
-    if (!url || !restaurantId) {
-      return res
-        .status(400)
-        .json({ error: "restaurantId and url are required" });
-    }
-
-    const response = await fetch(url);
-    const html = await response.text();
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a parser that extracts restaurant info. Extract name, address, hours, ordering link, google review link if present, offers, menu (categories and items with name, price, notes), FAQ. Respond ONLY with valid JSON.",
-        },
-        {
-          role: "user",
-          content: html,
-        },
-      ],
-      temperature: 0,
-    });
-
-    let extractedJson;
-    try {
-      extractedJson = JSON.parse(completion.choices[0].message.content);
-    } catch (e) {
-      console.error("JSON parse error:", e);
-      return res.status(500).json({ error: "Failed to parse AI JSON" });
-    }
-
-    const newRestaurant = {
-      id: restaurantId,
-      name: extractedJson.name || restaurantId,
-      address: extractedJson.address || "",
-      hours: extractedJson.hours || "",
-      phone: extractedJson.phone || "",
-      orderingLink: extractedJson.orderingLink || "",
-      googleReviewLink: extractedJson.googleReviewLink || "",
-      offers: extractedJson.offers || [],
-      menu: extractedJson.menu || [],
-      faq: extractedJson.faq || [],
-    };
-
-    restaurants[restaurantId] = newRestaurant;
-    saveRestaurants(restaurants);
-
-    res.json(newRestaurant);
-  } catch (err) {
-    console.error("Import error:", err);
-    res.status(500).json({ error: "Failed to import" });
-  }
-});
-
-// --- 4) Serve static files (widget.js etc.) ---
-app.use(express.static(path.join(__dirname, "public")));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Server listening on port", PORT);
-});
-
-app.use("/admin", express.static(path.join(path.resolve(), "public/admin")));
-
-import fetch from "node-fetch";
-import { JSDOM } from "jsdom";  // make sure this is at the top if not already
-
-app.post("/import-from-url", async (req, res) => {
-  try {
-    console.log("Import body:", req.body);
-
-    const { url, websiteUrl } = req.body || {};
-    const targetUrl = url || websiteUrl; // accept either field name
-
-    if (!targetUrl || typeof targetUrl !== "string") {
-      return res.status(400).json({ error: "URL is required" });
-    }
-
-    const response = await fetch(targetUrl);
-    const html = await response.text();
-
-    const dom = new JSDOM(html);
-    const text = dom.window.document.body.textContent || "";
-
-    if (!text.trim()) {
-      return res.status(500).json({ error: "No readable text found on page" });
-    }
-
-    const ai = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: `Extract a restaurant menu from this text and return ONLY valid JSON:\n\nFORMAT:\n[\n  {\n    "category": "Category Name",\n    "items": [\n      { "name": "Item Name", "price": "$0.00", "notes": "" }\n    ]\n  }\n]\n\nTEXT:\n${text}`
-        }
-      ]
-    });
-
-    const raw = ai.choices[0].message.content.trim();
-
-    // In case model wraps JSON in code fences, strip them
-    const cleaned = raw.replace(/^```json/i, "").replace(/```$/, "").trim();
-
-    let menuJson;
-    try {
-      menuJson = JSON.parse(cleaned);
-    } catch (e) {
-      console.error("JSON parse error on AI output:", cleaned);
-      return res.status(500).json({ error: "AI returned invalid JSON" });
-    }
-
-    return res.json({ menu: menuJson });
-
-  } catch (err) {
-    console.error("Import error:", err);
-    return res.status(500).json({ error: "Failed to import menu" });
-  }
-});
-
-
-
-import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
-
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUD_KEY,
-  api_secret: process.env.CLOUD_SECRET
-});
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-app.post("/upload-image", upload.single("image"), async (req, res) => {
-  try {
-    const result = await cloudinary.uploader.upload_stream(
-      { folder: "restaurant-menu" },
-      (error, uploadResult) => {
-        if (error) return res.status(500).json({ error });
-        res.json({ url: uploadResult.secure_url });
-      }
-    );
-
-    result.end(req.file.buffer); 
-  } catch (err) {
-    res.status(500).json({ error: "Upload failed" });
-  }
+start().catch((err) => {
+  console.error("Failed to start server:", err);
 });
