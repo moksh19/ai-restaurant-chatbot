@@ -1,15 +1,23 @@
 // public/widget.js
-(function () {
-  function initWidget() {
-    const scriptTag = document.currentScript || document.querySelector('script[src*="widget.js"]');
+window.addEventListener("load", function () {
+  try {
+    // Find the script tag that loaded this file
+    const scripts = document.getElementsByTagName("script");
+    let scriptTag = null;
+    for (let i = 0; i < scripts.length; i++) {
+      if (scripts[i].src && scripts[i].src.includes("widget.js")) {
+        scriptTag = scripts[i];
+        break;
+      }
+    }
+
     if (!scriptTag) {
       console.error("Chat widget: script tag not found");
       return;
     }
 
     const backendUrl =
-      scriptTag.getAttribute("data-backend-url") ||
-      window.location.origin;
+      scriptTag.getAttribute("data-backend-url") || window.location.origin;
     const restaurantId = scriptTag.getAttribute("data-restaurant-id");
 
     if (!restaurantId) {
@@ -17,13 +25,14 @@
       return;
     }
 
-    // Make sure body exists
-    const body = document.body || document.getElementsByTagName("body")[0];
+    const body =
+      document.body || document.getElementsByTagName("body")[0] || document.documentElement;
     if (!body) {
       console.error("Chat widget: <body> not found");
       return;
     }
 
+    // Create widget container
     const widget = document.createElement("div");
     widget.style.position = "fixed";
     widget.style.bottom = "20px";
@@ -37,7 +46,8 @@
     widget.style.display = "flex";
     widget.style.flexDirection = "column";
     widget.style.overflow = "hidden";
-    widget.style.fontFamily = "system-ui, -apple-system, BlinkMacSystemFont, Arial";
+    widget.style.fontFamily =
+      "system-ui, -apple-system, BlinkMacSystemFont, Arial";
 
     widget.innerHTML = `
       <div style="background:#111827;color:#fff;padding:10px 14px;font-size:14px;font-weight:bold;">
@@ -70,6 +80,7 @@
       span.style.padding = "6px 10px";
       span.style.borderRadius = "10px";
       span.style.maxWidth = "80%";
+
       if (sender === "user") {
         span.style.background = "#2563eb";
         span.style.color = "#fff";
@@ -126,13 +137,11 @@
     });
 
     // Greeting
-    addMessage("Hi! I’m your AI assistant. Ask me about our menu, offers, hours, or ordering.", "bot");
+    addMessage(
+      "Hi! I’m your AI assistant. Ask me about our menu, offers, hours, or ordering.",
+      "bot"
+    );
+  } catch (e) {
+    console.error("Chat widget init error:", e);
   }
-
-  // Wait for DOM to be ready so <body> exists
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initWidget);
-  } else {
-    initWidget();
-  }
-})();
+});
