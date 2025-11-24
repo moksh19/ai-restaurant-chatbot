@@ -32,10 +32,15 @@ async function load() {
     div.className = "p-4 bg-gray-50 border rounded";
 
     div.innerHTML = `
-      <div class="font-semibold text-lg">${r.name}</div>
-      <div class="text-sm text-gray-600">ID: ${r.id}</div>
-      <a href="/admin/edit.html?id=${r.id}" class="text-blue-600 underline">Edit</a>
-    `;
+  <div class="font-semibold text-lg">${r.name}</div>
+  <div class="text-sm text-gray-600">ID: ${r.id}</div>
+  <div class="mt-2 space-x-3 text-sm">
+    <a href="/admin/edit.html?id=${r.id}" class="text-blue-600 underline">Edit Basic</a>
+    <a href="/admin/menu.html?id=${r.id}" class="text-green-600 underline">Edit Menu</a>
+    <a href="/admin/offers.html?id=${r.id}" class="text-purple-600 underline">Edit Offers</a>
+  </div>
+`;
+
     container.appendChild(div);
   });
 }

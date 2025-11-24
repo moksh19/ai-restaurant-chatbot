@@ -157,17 +157,17 @@ app.post("/restaurants/:id", (req, res) => {
   const id = req.params.id;
   const body = req.body;
 
+  const existing = restaurants[id] || { id };
+
+  // Merge existing data with new data (partial updates)
   const newRestaurant = {
+    ...existing,
+    ...body,
     id,
-    name: body.name,
-    address: body.address,
-    hours: body.hours,
-    phone: body.phone,
-    orderingLink: body.orderingLink,
-    googleReviewLink: body.googleReviewLink,
-    offers: body.offers || [],
-    menu: body.menu || [],
-    faq: body.faq || [],
+    // Ensure arrays don't get accidentally set to undefined
+    offers: body.offers ?? existing.offers ?? [],
+    menu: body.menu ?? existing.menu ?? [],
+    faq: body.faq ?? existing.faq ?? [],
   };
 
   restaurants[id] = newRestaurant;
@@ -175,6 +175,7 @@ app.post("/restaurants/:id", (req, res) => {
 
   res.json(newRestaurant);
 });
+
 
 // Delete
 app.delete("/restaurants/:id", (req, res) => {
@@ -254,3 +255,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server listening on port", PORT);
 });
+
+app.use("/admin", express.static(path.join(path.resolve(), "public/admin")));

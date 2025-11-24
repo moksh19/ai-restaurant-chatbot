@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Edit Offers</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+<div class="max-w-2xl mx-auto bg-white shadow mt-8 p-6 rounded">
+  <h1 class="text-2xl font-bold mb-2">Edit Offers</h1>
+  <div id="restaurantName" class="text-gray-600 mb-4"></div>
+
+  <div id="offersContainer" class="space-y-2 mb-4"></div>
+
+  <button onclick="addOffer()" class="bg-green-600 text-white px-3 py-1 rounded">
+    + Add Offer
+  </button>
+
+  <div class="mt-6 flex gap-3">
+    <button onclick="saveOffers()" class="bg-blue-600 text-white px-4 py-2 rounded">
+      Save Offers
+    </button>
+    <a href="/admin/index.html" class="text-blue-600 underline mt-2">Back to Dashboard</a>
+  </div>
+</div>
+
+<script>
+const url = new URL(window.location.href);
+const id = url.searchParams.get("id");
+
+let restaurant = null;
+
+async function loadRestaurant() {
+  const res = await fetch("/restaurants");
+  const data = await res.json();
+  restaurant = data.find(r => r.id === id);
+
+  if (!restaurant) {
+    alert("Restaurant not found");
+    return;
+  }
+
+  if (!Array.isArray(restaurant.offers)) {
+    restaurant.offers = [];
+  }
+
+  document.getElementById("restaurantName").textContent =
+    restaurant.name + " (ID: " + restaurant.id + ")";
+
+  renderOffers();
+}
+
+function renderOffers() {
+  const container = document.getElementById("offersContainer");
+  container.innerHTML = "";
+
+  restaurant.offers.forEach((offer, index) => {
+    const row = document.createElement("div");
+    row.className = "flex gap-2 items-center";
+
+    row.innerHTML = `
+      <input type="text" value="${offer}" class="border p-2 rounded flex-1 text-sm"
+             data-offer-index="${index}" />
+      <button class="text-red-600 text-xs remove-offer" data-offer-index="${index}">
+        ✕
+      </button>
+    `;
+
+    container.appendChild(row);
+  });
+
+  attachOfferHandlers();
+}
+
+function attachOfferHandlers() {
+  document.querySelectorAll('input[data-offer-index]').forEach(input => {
+    input.addEventListener("input", (e) => {
+      const idx = parseInt(e.target.getAttribute("data-offer-index"));
+      restaurant.offers[idx] = e.target.value;
+    });
+  });
+
+  document.querySelectorAll('.remove-offer').forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const idx = parseInt(e.target.getAttribute("data-offer-index"));
+      restaurant.offers.splice(idx, 1);
+      renderOffers();
+    });
+  });
+}
+
+function addOffer() {
+  restaurant.offers.push("");
+  renderOffers();
+}
+
+async function saveOffers() {
+  const cleaned = restaurant.offers.map(o => o.trim()).filter(o => o.length > 0);
+
+  const payload = {
+    offers: cleaned
+  };
+
+  const res = await fetch(`/restaurants/${restaurant.id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok) {
+    alert("Offers saved!");
+  } else {
+    alert("Error saving offers");
+  }
+}
+
+loadRestaurant();
+</script>
+</body>
+</html>

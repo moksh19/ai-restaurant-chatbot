@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Edit Menu</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+<div class="max-w-4xl mx-auto bg-white shadow mt-8 p-6 rounded">
+  <h1 class="text-2xl font-bold mb-2">Edit Menu</h1>
+  <div id="restaurantName" class="text-gray-600 mb-4"></div>
+
+  <div class="flex justify-between items-center mb-4">
+    <h2 class="text-xl font-semibold">Categories</h2>
+    <button onclick="addCategory()" class="bg-green-600 text-white px-3 py-1 rounded">
+      + Add Category
+    </button>
+  </div>
+
+  <div id="menuContainer" class="space-y-4"></div>
+
+  <div class="mt-6 flex gap-3">
+    <button onclick="saveMenu()" class="bg-blue-600 text-white px-4 py-2 rounded">
+      Save Menu
+    </button>
+    <a href="/admin/index.html" class="text-blue-600 underline mt-2">Back to Dashboard</a>
+  </div>
+</div>
+
+<script>
+const url = new URL(window.location.href);
+const id = url.searchParams.get("id");
+
+let restaurant = null;
+
+async function loadRestaurant() {
+  const res = await fetch("/restaurants");
+  const data = await res.json();
+  restaurant = data.find(r => r.id === id);
+
+  if (!restaurant) {
+    alert("Restaurant not found");
+    return;
+  }
+
+  if (!Array.isArray(restaurant.menu)) {
+    restaurant.menu = [];
+  }
+
+  document.getElementById("restaurantName").textContent =
+    restaurant.name + " (ID: " + restaurant.id + ")";
+
+  renderMenu();
+}
+
+function renderMenu() {
+  const container = document.getElementById("menuContainer");
+  container.innerHTML = "";
+
+  restaurant.menu.forEach((section, sectionIndex) => {
+    const card = document.createElement("div");
+    card.className = "border rounded p-4 bg-gray-50";
+
+    card.innerHTML = `
+      <div class="flex justify-between items-center mb-2">
+        <input
+          type="text"
+          value="${section.category || ""}"
+          placeholder="Category name (e.g., Pizzas)"
+          class="border p-2 rounded w-2/3"
+          data-section-index="${sectionIndex}"
+          data-field="category"
+        />
+        <button data-section-index="${sectionIndex}" class="text-red-600 text-sm remove-category">
+          Remove Category
+        </button>
+      </div>
+      <div class="text-sm text-gray-600 mb-2">Items</div>
+      <div class="space-y-2" id="items-${sectionIndex}"></div>
+      <button data-section-index="${sectionIndex}" class="mt-2 bg-green-600 text-white text-sm px-3 py-1 rounded add-item">
+        + Add Item
+      </button>
+    `;
+
+    container.appendChild(card);
+
+    const itemsContainer = card.querySelector("#items-" + sectionIndex);
+    (section.items || []).forEach((item, itemIndex) => {
+      const row = document.createElement("div");
+      row.className = "grid grid-cols-3 gap-2 items-center";
+
+      row.innerHTML = `
+        <input type="text" value="${item.name || ""}" placeholder="Item name"
+               class="border p-1 rounded text-sm"
+               data-section-index="${sectionIndex}"
+               data-item-index="${itemIndex}"
+               data-field="name" />
+        <input type="text" value="${item.price || ""}" placeholder="Price"
+               class="border p-1 rounded text-sm"
+               data-section-index="${sectionIndex}"
+               data-item-index="${itemIndex}"
+               data-field="price" />
+        <div class="flex gap-2">
+          <input type="text" value="${item.notes || ""}" placeholder="Notes"
+                 class="border p-1 rounded text-sm flex-1"
+                 data-section-index="${sectionIndex}"
+                 data-item-index="${itemIndex}"
+                 data-field="notes" />
+          <button class="text-red-600 text-xs remove-item"
+                  data-section-index="${sectionIndex}"
+                  data-item-index="${itemIndex}">
+            ✕
+          </button>
+        </div>
+      `;
+      itemsContainer.appendChild(row);
+    });
+  });
+
+  attachMenuEventHandlers();
+}
+
+function attachMenuEventHandlers() {
+  // Category name change
+  document.querySelectorAll('input[data-field="category"]').forEach(input => {
+    input.addEventListener("input", (e) => {
+      const idx = parseInt(e.target.getAttribute("data-section-index"));
+      restaurant.menu[idx].category = e.target.value;
+    });
+  });
+
+  // Item fields change
+  ["name", "price", "notes"].forEach(field => {
+    document.querySelectorAll(`input[data-field="${field}"]`).forEach(input => {
+      input.addEventListener("input", (e) => {
+        const sIdx = parseInt(e.target.getAttribute("data-section-index"));
+        const iIdx = parseInt(e.target.getAttribute("data-item-index"));
+        restaurant.menu[sIdx].items[iIdx][field] = e.target.value;
+      });
+    });
+  });
+
+  // Add item buttons
+  document.querySelectorAll(".add-item").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const sIdx = parseInt(e.target.getAttribute("data-section-index"));
+      if (!Array.isArray(restaurant.menu[sIdx].items)) {
+        restaurant.menu[sIdx].items = [];
+      }
+      restaurant.menu[sIdx].items.push({ name: "", price: "", notes: "" });
+      renderMenu();
+    });
+  });
+
+  // Remove item buttons
+  document.querySelectorAll(".remove-item").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const sIdx = parseInt(e.target.getAttribute("data-section-index"));
+      const iIdx = parseInt(e.target.getAttribute("data-item-index"));
+      restaurant.menu[sIdx].items.splice(iIdx, 1);
+      renderMenu();
+    });
+  });
+
+  // Remove category buttons
+  document.querySelectorAll(".remove-category").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const sIdx = parseInt(e.target.getAttribute("data-section-index"));
+      restaurant.menu.splice(sIdx, 1);
+      renderMenu();
+    });
+  });
+}
+
+function addCategory() {
+  if (!Array.isArray(restaurant.menu)) {
+    restaurant.menu = [];
+  }
+  restaurant.menu.push({ category: "", items: [] });
+  renderMenu();
+}
+
+async function saveMenu() {
+  const payload = {
+    // Only update menu; backend will merge with existing fields
+    menu: restaurant.menu
+  };
+
+  const res = await fetch(`/restaurants/${restaurant.id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok) {
+    alert("Menu saved!");
+  } else {
+    alert("Error saving menu");
+  }
+}
+
+loadRestaurant();
+</script>
+</body>
+</html>
