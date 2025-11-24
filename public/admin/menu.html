@@ -88,7 +88,7 @@ function renderMenu() {
     const itemsContainer = card.querySelector("#items-" + sectionIndex);
     (section.items || []).forEach((item, itemIndex) => {
       const row = document.createElement("div");
-      row.className = "grid grid-cols-3 gap-2 items-center";
+      row.className = "grid grid-cols-3 gap-2 items-start";
 
       row.innerHTML = `
         <input type="text" value="${item.name || ""}" placeholder="Item name"
@@ -96,22 +96,35 @@ function renderMenu() {
                data-section-index="${sectionIndex}"
                data-item-index="${itemIndex}"
                data-field="name" />
+
         <input type="text" value="${item.price || ""}" placeholder="Price"
                class="border p-1 rounded text-sm"
                data-section-index="${sectionIndex}"
                data-item-index="${itemIndex}"
                data-field="price" />
-        <div class="flex gap-2">
+
+        <div class="flex flex-col gap-2">
+
           <input type="text" value="${item.notes || ""}" placeholder="Notes"
                  class="border p-1 rounded text-sm flex-1"
                  data-section-index="${sectionIndex}"
                  data-item-index="${itemIndex}"
                  data-field="notes" />
+
+          <img src="${item.image || ""}" 
+               class="h-12 w-12 object-cover rounded border"
+               style="display:${item.image ? 'block' : 'none'}">
+
+          <input type="file" class="upload-image"
+                 data-section-index="${sectionIndex}"
+                 data-item-index="${itemIndex}" />
+
           <button class="text-red-600 text-xs remove-item"
                   data-section-index="${sectionIndex}"
                   data-item-index="${itemIndex}">
-            ✕
+            ✕ Remove
           </button>
+
         </div>
       `;
       itemsContainer.appendChild(row);
@@ -141,19 +154,19 @@ function attachMenuEventHandlers() {
     });
   });
 
-  // Add item buttons
+  // Add item
   document.querySelectorAll(".add-item").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const sIdx = parseInt(e.target.getAttribute("data-section-index"));
       if (!Array.isArray(restaurant.menu[sIdx].items)) {
         restaurant.menu[sIdx].items = [];
       }
-      restaurant.menu[sIdx].items.push({ name: "", price: "", notes: "" });
+      restaurant.menu[sIdx].items.push({ name: "", price: "", notes: "", image: "" });
       renderMenu();
     });
   });
 
-  // Remove item buttons
+  // Remove item
   document.querySelectorAll(".remove-item").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const sIdx = parseInt(e.target.getAttribute("data-section-index"));
@@ -163,7 +176,7 @@ function attachMenuEventHandlers() {
     });
   });
 
-  // Remove category buttons
+  // Remove category
   document.querySelectorAll(".remove-category").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const sIdx = parseInt(e.target.getAttribute("data-section-index"));
@@ -171,21 +184,36 @@ function attachMenuEventHandlers() {
       renderMenu();
     });
   });
+
+  // Image upload
+  document.querySelectorAll(".upload-image").forEach(input => {
+    input.addEventListener("change", async (e) => {
+      const s = e.target.dataset.sectionIndex;
+      const i = e.target.dataset.itemIndex;
+
+      const form = new FormData();
+      form.append("image", e.target.files[0]);
+
+      const res = await fetch("/upload-image", {
+        method: "POST",
+        body: form
+      });
+
+      const data = await res.json();
+      restaurant.menu[s].items[i].image = data.url;
+
+      renderMenu();
+    });
+  });
 }
 
 function addCategory() {
-  if (!Array.isArray(restaurant.menu)) {
-    restaurant.menu = [];
-  }
   restaurant.menu.push({ category: "", items: [] });
   renderMenu();
 }
 
 async function saveMenu() {
-  const payload = {
-    // Only update menu; backend will merge with existing fields
-    menu: restaurant.menu
-  };
+  const payload = { menu: restaurant.menu };
 
   const res = await fetch(`/restaurants/${restaurant.id}`, {
     method: "POST",
@@ -202,5 +230,6 @@ async function saveMenu() {
 
 loadRestaurant();
 </script>
+
 </body>
 </html>

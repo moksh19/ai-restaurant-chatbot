@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Import Menu</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100">
+
+<div class="max-w-xl mx-auto bg-white shadow mt-10 p-6 rounded">
+  <h1 class="text-2xl font-bold mb-4">Import Menu From Website</h1>
+
+  <label class="block font-semibold mb-1">Restaurant ID</label>
+  <input id="id" class="border p-2 w-full mb-3"/>
+
+  <label class="block font-semibold mb-1">Website URL</label>
+  <input id="url" class="border p-2 w-full mb-3" placeholder="https://restaurant.com/menu"/>
+
+  <button onclick="importMenu()" 
+          class="bg-blue-600 text-white px-4 py-2 rounded w-full">
+    Import Menu
+  </button>
+
+  <pre id="output" class="mt-4 p-4 bg-gray-50 border rounded h-64 overflow-auto"></pre>
+
+  <button onclick="saveMenu()" id="saveBtn" 
+          class="hidden bg-green-600 text-white px-4 py-2 rounded w-full mt-4">
+    Save to Restaurant
+  </button>
+
+  <a href="/admin/index.html" class="block mt-4 text-blue-600 underline">Back</a>
+</div>
+
+<script>
+let importedMenu = null;
+
+async function importMenu() {
+  const url = document.getElementById("url").value;
+
+  const res = await fetch("/import-from-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url })
+  });
+
+  const data = await res.json();
+  importedMenu = data.menu;
+
+  document.getElementById("output").textContent = 
+    JSON.stringify(data.menu, null, 2);
+
+  document.getElementById("saveBtn").classList.remove("hidden");
+}
+
+async function saveMenu() {
+  const id = document.getElementById("id").value;
+
+  await fetch(`/restaurants/${id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ menu: importedMenu })
+  });
+
+  alert("Menu imported & saved!");
+}
+</script>
+
+</body>
+</html>

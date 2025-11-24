@@ -6,7 +6,6 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import OpenAI from "openai";
-import fetch from "node-fetch";
 
 dotenv.config();
 
@@ -257,3 +256,82 @@ app.listen(PORT, () => {
 });
 
 app.use("/admin", express.static(path.join(path.resolve(), "public/admin")));
+
+import fetch from "node-fetch";
+import { JSDOM } from "jsdom";
+
+app.post("/import-from-url", async (req, res) => {
+  try {
+    const { url } = req.body;
+
+    if (!url) {
+      return res.status(400).json({ error: "URL is required" });
+    }
+
+    // 1. Fetch website HTML
+    const response = await fetch(url);
+    const html = await response.text();
+
+    // 2. Extract text only
+    const dom = new JSDOM(html);
+    const text = dom.window.document.body.textContent;
+
+    // 3. Ask OpenAI to extract structured menu
+    const ai = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: `Extract a restaurant menu from this text and return JSON:
+          FORMAT:
+          [
+            {
+              "category": "Category Name",
+              "items": [
+                { "name": "Item Name", "price": "$0.00", "notes": "" }
+              ]
+            }
+          ]
+          TEXT:
+          ${text}`
+        }
+      ]
+    });
+
+    const menuJson = JSON.parse(ai.choices[0].message.content);
+
+    res.json({ menu: menuJson });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to import menu" });
+  }
+});
+
+
+import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_KEY,
+  api_secret: process.env.CLOUD_SECRET
+});
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post("/upload-image", upload.single("image"), async (req, res) => {
+  try {
+    const result = await cloudinary.uploader.upload_stream(
+      { folder: "restaurant-menu" },
+      (error, uploadResult) => {
+        if (error) return res.status(500).json({ error });
+        res.json({ url: uploadResult.secure_url });
+      }
+    );
+
+    result.end(req.file.buffer); 
+  } catch (err) {
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
