@@ -1,5 +1,5 @@
-[
-  {
+{
+  "pizza-pints": {
     "id": "pizza-pints",
     "menu": [
       {
@@ -79,4 +79,4 @@
       }
     ]
   }
-]
+}
