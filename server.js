@@ -258,55 +258,60 @@ app.listen(PORT, () => {
 app.use("/admin", express.static(path.join(path.resolve(), "public/admin")));
 
 import fetch from "node-fetch";
-import { JSDOM } from "jsdom";
+import { JSDOM } from "jsdom";  // make sure this is at the top if not already
 
 app.post("/import-from-url", async (req, res) => {
   try {
-    const { url } = req.body;
+    console.log("Import body:", req.body);
 
-    if (!url) {
+    const { url, websiteUrl } = req.body || {};
+    const targetUrl = url || websiteUrl; // accept either field name
+
+    if (!targetUrl || typeof targetUrl !== "string") {
       return res.status(400).json({ error: "URL is required" });
     }
 
-    // 1. Fetch website HTML
-    const response = await fetch(url);
+    const response = await fetch(targetUrl);
     const html = await response.text();
 
-    // 2. Extract text only
     const dom = new JSDOM(html);
-    const text = dom.window.document.body.textContent;
+    const text = dom.window.document.body.textContent || "";
 
-    // 3. Ask OpenAI to extract structured menu
+    if (!text.trim()) {
+      return res.status(500).json({ error: "No readable text found on page" });
+    }
+
     const ai = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
-          content: `Extract a restaurant menu from this text and return JSON:
-          FORMAT:
-          [
-            {
-              "category": "Category Name",
-              "items": [
-                { "name": "Item Name", "price": "$0.00", "notes": "" }
-              ]
-            }
-          ]
-          TEXT:
-          ${text}`
+          content: `Extract a restaurant menu from this text and return ONLY valid JSON:\n\nFORMAT:\n[\n  {\n    "category": "Category Name",\n    "items": [\n      { "name": "Item Name", "price": "$0.00", "notes": "" }\n    ]\n  }\n]\n\nTEXT:\n${text}`
         }
       ]
     });
 
-    const menuJson = JSON.parse(ai.choices[0].message.content);
+    const raw = ai.choices[0].message.content.trim();
 
-    res.json({ menu: menuJson });
+    // In case model wraps JSON in code fences, strip them
+    const cleaned = raw.replace(/^```json/i, "").replace(/```$/, "").trim();
+
+    let menuJson;
+    try {
+      menuJson = JSON.parse(cleaned);
+    } catch (e) {
+      console.error("JSON parse error on AI output:", cleaned);
+      return res.status(500).json({ error: "AI returned invalid JSON" });
+    }
+
+    return res.json({ menu: menuJson });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to import menu" });
+    console.error("Import error:", err);
+    return res.status(500).json({ error: "Failed to import menu" });
   }
 });
+
 
 
 import multer from "multer";
