@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Add Restaurant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+<div class="max-w-xl mx-auto bg-white shadow mt-10 p-6 rounded">
+  <h1 class="text-2xl font-bold mb-4">Add Restaurant</h1>
+
+  <label class="block font-semibold">Restaurant ID</label>
+  <input id="id" class="border p-2 w-full mb-3"/>
+
+  <label class="block font-semibold">Name</label>
+  <input id="name" class="border p-2 w-full mb-3"/>
+
+  <label class="block font-semibold">Hours</label>
+  <input id="hours" class="border p-2 w-full mb-3"/>
+
+  <button onclick="save()" class="bg-green-600 text-white px-4 py-2 rounded">Save</button>
+
+  <a href="/admin/index.html" class="block mt-4 text-blue-600 underline">Back</a>
+</div>
+
+<script>
+async function save() {
+  const payload = {
+    name: document.getElementById("name").value,
+    hours: document.getElementById("hours").value,
+  };
+
+  const id = document.getElementById("id").value;
+
+  const res = await fetch(`/restaurants/${id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok) {
+    alert("Restaurant added!");
+    window.location = "/admin/index.html";
+  } else {
+    alert("Error adding restaurant");
+  }
+}
+</script>
+</body>
+</html>

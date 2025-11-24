@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+  <div class="max-w-3xl mx-auto mt-10 bg-white shadow p-6 rounded">
+    <h1 class="text-2xl font-bold mb-4">Restaurant Dashboard</h1>
+
+    <a href="/admin/add.html" 
+       class="bg-blue-600 text-white px-4 py-2 rounded inline-block mb-4">
+      ➕ Add Restaurant
+    </a>
+
+    <h2 class="text-xl font-semibold mb-2">Current Restaurants</h2>
+
+    <div id="restaurants" class="space-y-3"></div>
+  </div>
+
+<script>
+async function load() {
+  const res = await fetch("/restaurants");
+  const data = await res.json();
+
+  const container = document.getElementById("restaurants");
+
+  data.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "p-4 bg-gray-50 border rounded";
+
+    div.innerHTML = `
+      <div class="font-semibold text-lg">${r.name}</div>
+      <div class="text-sm text-gray-600">ID: ${r.id}</div>
+      <a href="/admin/edit.html?id=${r.id}" class="text-blue-600 underline">Edit</a>
+    `;
+    container.appendChild(div);
+  });
+}
+
+load();
+</script>
+</body>
+</html>
