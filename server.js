@@ -275,6 +275,22 @@ app.get("/restaurants", (req, res) => {
   res.json(Object.values(restaurants));
 });
 
+// Download full backup of all restaurants
+app.get("/admin/backup", (req, res) => {
+  try {
+    const backupJson = JSON.stringify(restaurants, null, 2);
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=restaurants-backup.json"
+    );
+    res.send(backupJson);
+  } catch (err) {
+    console.error("Backup error:", err);
+    res.status(500).send("Error generating backup");
+  }
+});
+
 app.post("/restaurants/:id", async (req, res) => {
   const id = req.params.id;
   const data = req.body || {};
