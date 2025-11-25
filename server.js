@@ -28,6 +28,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/admin", express.static(path.join(__dirname, "public/admin")));
 
+app.get("/landing.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "landing.html"));
+});
+
 // Redirect root to admin dashboard
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "landing.html"));
