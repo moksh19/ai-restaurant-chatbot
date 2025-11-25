@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Import Offers From Website</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+<div class="max-w-3xl mx-auto bg-white shadow mt-10 p-6 rounded">
+  <h1 class="text-2xl font-bold mb-4">Import Offers From Website</h1>
+
+  <p class="text-sm text-gray-600 mb-4">
+    Paste the URL where the restaurant publishes its specials / promotions. We'll scan the page
+    and extract time-bound offers (like happy hour, limited-time deals, etc.). You can review
+    and then save them to this restaurant.
+  </p>
+
+  <!-- Restaurant ID -->
+  <label class="block font-semibold mb-1">Restaurant ID</label>
+  <input
+    id="restaurantId"
+    type="text"
+    class="w-full border p-2 rounded mb-4"
+    placeholder="pizza-pints"
+  />
+
+  <!-- URL -->
+  <label class="block font-semibold mb-1">Website URL with offers</label>
+  <input
+    id="offersUrl"
+    type="text"
+    class="w-full border p-2 rounded mb-4"
+    placeholder="https://example.com/specials"
+  />
+
+  <!-- Import Mode -->
+  <div class="mb-4">
+    <label class="block font-semibold mb-1">Save Mode</label>
+
+    <label class="flex items-center gap-2 mb-1 text-sm">
+      <input type="radio" name="importMode" value="merge" checked />
+      <span>Merge with existing offers (append)</span>
+    </label>
+
+    <label class="flex items-center gap-2 text-sm">
+      <input type="radio" name="importMode" value="replace" />
+      <span>Replace existing offers (overwrite all offers)</span>
+    </label>
+  </div>
+
+  <button
+    onclick="importOffers()"
+    class="w-full bg-blue-600 text-white p-2 rounded mb-4"
+  >
+    Import Offers
+  </button>
+
+  <div>
+    <h2 class="font-semibold mb-2">Preview (detected offers)</h2>
+    <pre
+      id="preview"
+      class="w-full bg-gray-50 border p-3 rounded h-64 overflow-auto text-xs"
+    ></pre>
+  </div>
+
+  <button
+    id="saveBtn"
+    onclick="saveImportedOffers()"
+    class="w-full bg-green-600 text-white p-2 rounded mt-4 hidden"
+  >
+    Save Offers To Restaurant
+  </button>
+
+  <a
+    href="/admin/index.html"
+    class="block text-blue-700 underline text-sm mt-4"
+  >
+    ← Back to Dashboard
+  </a>
+</div>
+
+<script>
+let importedOffers = null;
+
+function prefillRestaurantId() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+  if (id) {
+    document.getElementById("restaurantId").value = id;
+  }
+}
+
+async function importOffers() {
+  const restaurantId = document.getElementById("restaurantId").value.trim();
+  const url = document.getElementById("offersUrl").value.trim();
+
+  const preview = document.getElementById("preview");
+  const saveBtn = document.getElementById("saveBtn");
+
+  if (!restaurantId || !url) {
+    preview.textContent = "Error: Restaurant ID and URL are required.";
+    saveBtn.classList.add("hidden");
+    return;
+  }
+
+  preview.textContent = "Importing offers from website...";
+  saveBtn.classList.add("hidden");
+
+  try {
+    const res = await fetch("/import-offers-from-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restaurantId, url })
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      preview.textContent = "Error: " + data.error;
+      return;
+    }
+
+    importedOffers = data.offers || [];
+
+    preview.textContent = JSON.stringify(importedOffers, null, 2);
+
+    if (importedOffers.length > 0) {
+      saveBtn.classList.remove("hidden");
+    } else {
+      saveBtn.classList.add("hidden");
+    }
+
+  } catch (err) {
+    console.error("Import offers error:", err);
+    preview.textContent = "Error: Failed to import offers. See console for details.";
+    saveBtn.classList.add("hidden");
+  }
+}
+
+async function saveImportedOffers() {
+  const restaurantId = document.getElementById("restaurantId").value.trim();
+  if (!restaurantId) {
+    alert("Restaurant ID is required.");
+    return;
+  }
+  if (!importedOffers || importedOffers.length === 0) {
+    alert("No imported offers to save.");
+    return;
+  }
+
+  const mode = document.querySelector('input[name="importMode"]:checked').value;
+
+  if (mode === "replace") {
+    const confirmReplace = confirm(
+      "This will REPLACE all existing offers for this restaurant. Continue?"
+    );
+    if (!confirmReplace) return;
+  }
+
+  const payload = {
+    offers: importedOffers,
+    replaceOffers: mode === "replace"
+  };
+
+  try {
+    const res = await fetch(`/restaurants/${encodeURIComponent(restaurantId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      alert("Offers saved successfully!");
+    } else {
+      alert("Error saving offers.");
+    }
+  } catch (err) {
+    console.error("Save offers error:", err);
+    alert("Error saving offers. Check console.");
+  }
+}
+
+prefillRestaurantId();
+</script>
+</body>
+</html>

@@ -229,6 +229,67 @@ Extract a restaurant menu from this image and return ONLY valid JSON:
   }
 });
 
+
+// =========================================================
+// IMPORT OFFERS FROM WEBSITE URL — PREVIEW ONLY
+// =========================================================
+
+app.post("/import-offers-from-url", async (req, res) => {
+  try {
+    const { restaurantId, url } = req.body;
+
+    if (!restaurantId || !url) {
+      return res.status(400).json({ error: "restaurantId and url required" });
+    }
+
+    // Fetch HTML from the website
+    const response = await fetch(url);
+    const html = await response.text();
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: `
+Extract ONLY time-bound promotions / specials / discounts / offers from this HTML.
+IGNORE normal menu items and regular prices.
+
+Return STRICT JSON like this:
+
+[
+  {
+    "title": "Name of promotion",
+    "details": "Human-readable description",
+    "code": "Coupon code or null",
+    "startDate": "YYYY-MM-DD or null",
+    "endDate": "YYYY-MM-DD or null",
+    "startTime": "HH:MM or null",
+    "endTime": "HH:MM or null",
+    "daysOfWeek": [0,1,2]  // 0=Sunday..6=Saturday or []
+  }
+]
+
+If dates or times are not clearly specified, set them to null.
+HTML:
+${html}
+`
+        }
+      ]
+    });
+
+    let raw = completion.choices[0].message.content.trim();
+    raw = raw.replace(/^```json/i, "").replace(/```$/i, "").trim();
+
+    const offers = JSON.parse(raw);
+
+    return res.json({ offers });
+  } catch (err) {
+    console.error("import-offers-from-url failed:", err);
+    return res.status(500).json({ error: "Failed to import offers from URL" });
+  }
+});
+
 // =========================================================
 // MERGE LOGIC — FOR MENUS
 // =========================================================
@@ -301,15 +362,27 @@ app.post("/restaurants/:id", async (req, res) => {
 
   const existing = restaurants[id] || { id, menu: [], offers: [], faq: [] };
 
+  // Handle menu
   let finalMenu = existing.menu;
-
   if (Array.isArray(data.menu)) {
     if (data.replace) {
-      // FULL REPLACE mode
+      // FULL REPLACE of menu
       finalMenu = data.menu;
     } else {
-      // MERGE mode (default)
+      // MERGE menu
       finalMenu = mergeMenus(existing.menu, data.menu);
+    }
+  }
+
+  // Handle offers (for 2B)
+  let finalOffers = existing.offers || [];
+  if (Array.isArray(data.offers)) {
+    if (data.replaceOffers) {
+      // FULL REPLACE of offers
+      finalOffers = data.offers;
+    } else {
+      // APPEND to existing offers
+      finalOffers = [...(existing.offers || []), ...data.offers];
     }
   }
 
@@ -318,16 +391,19 @@ app.post("/restaurants/:id", async (req, res) => {
     ...data,
     id,
     menu: finalMenu,
+    offers: finalOffers,
   };
 
-  // prevent replace flag from being accidentally stored
+  // Don't accidentally store control flags
   delete updated.replace;
+  delete updated.replaceOffers;
 
   restaurants[id] = updated;
   await saveRestaurants(restaurants);
 
   res.json(updated);
 });
+
 
 // =========================================================
 // CHATBOT

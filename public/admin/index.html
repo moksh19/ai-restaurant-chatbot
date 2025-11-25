@@ -54,7 +54,12 @@ async function loadRestaurants() {
           <a href="offers.html?id=${encodeURIComponent(r.id)}" class="text-purple-700 underline">Edit Offers</a>
           <a href="import-image.html?id=${encodeURIComponent(r.id)}" class="text-orange-700 underline">Import Menu From Image</a>
           <a href="import.html?id=${encodeURIComponent(r.id)}" class="text-teal-700 underline">Import Menu From URL</a>
-        </div>
+        <a href="import-offers.html?id=${encodeURIComponent(id)}"
+   class="text-pink-700 underline">
+  Import Offers From Website
+</a>
+
+          </div>
 
         <details class="mt-4 bg-white border p-3 rounded">
           <summary class="cursor-pointer text-sm font-semibold">Embed Code</summary>
