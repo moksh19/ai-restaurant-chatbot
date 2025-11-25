@@ -10,6 +10,7 @@
 <div class="max-w-4xl mx-auto mt-10 bg-white shadow rounded p-6">
   <h1 class="text-3xl font-bold mb-6">Restaurant Dashboard</h1>
 
+  <!-- Top buttons -->
   <div class="flex flex-wrap gap-3 mb-4">
     <button
       onclick="window.location.href='/admin/add.html'"
@@ -43,7 +44,11 @@ async function loadRestaurants() {
     const data = await res.json();
 
     if (!Array.isArray(data) || data.length === 0) {
-      list.innerHTML = '<div class="text-gray-500">No restaurants yet. Click "Add Restaurant" to create one.</div>';
+      list.innerHTML = `
+        <div class="text-gray-500">
+          No restaurants yet. Click "Add Restaurant" to create one.
+        </div>
+      `;
       return;
     }
 
@@ -117,7 +122,11 @@ async function loadRestaurants() {
     });
   } catch (err) {
     console.error("Error loading restaurants:", err);
-    list.innerHTML = '<div class="text-red-600">Error loading restaurants</div>';
+    list.innerHTML = `
+      <div class="text-red-600 font-semibold p-4 bg-red-50 rounded">
+        Error loading restaurants
+      </div>
+    `;
   }
 }
 
