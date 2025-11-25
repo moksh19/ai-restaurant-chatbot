@@ -9,20 +9,33 @@
 
 <div class="max-w-5xl mx-auto mt-10 bg-white shadow p-6 rounded">
   <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold">Restaurant Dashboard</h1>
-    <div class="flex gap-3">
-      <a
-        href="add.html"
-        class="bg-blue-600 text-white px-4 py-2 rounded"
+    <div>
+      <h1 class="text-3xl font-bold">Restaurant Dashboard</h1>
+      <p class="text-xs text-gray-500 mt-1">
+        Manage restaurants, menus, offers, and auto-import sources.
+      </p>
+    </div>
+    <div class="flex flex-col items-end gap-2">
+      <div class="flex gap-3">
+        <a
+          href="add.html"
+          class="bg-blue-600 text-white px-4 py-2 rounded text-sm"
+        >
+          + Add Restaurant
+        </a>
+        <a
+          href="/admin/backup"
+          class="bg-slate-800 text-white px-4 py-2 rounded text-sm"
+        >
+          Download Backup (JSON)
+        </a>
+      </div>
+      <button
+        onclick="runRescan()"
+        class="mt-1 text-xs bg-amber-500 text-slate-900 px-3 py-1 rounded"
       >
-        + Add Restaurant
-      </a>
-      <a
-        href="/admin/backup"
-        class="bg-slate-800 text-white px-4 py-2 rounded"
-      >
-        Download Backup (JSON)
-      </a>
+        Run Daily Rescan Now
+      </button>
     </div>
   </div>
 
@@ -62,14 +75,22 @@ async function loadRestaurants() {
       const card = document.createElement("div");
       card.className = "border rounded p-4 bg-gray-50";
 
-      // embed snippet
       const snippet = `<script src="${origin}/widget.js" data-restaurant-id="${id}" data-backend-url="${origin}"><\\/script>`;
 
+      const metaSource = r.metaSourceUrl || "";
+      const menuSource = r.menuSourceUrl || "";
+      const offersSource = r.offersSourceUrl || "";
+
       card.innerHTML = `
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-start gap-4">
           <div>
             <div class="text-xl font-semibold">${name}</div>
             <div class="text-sm text-gray-600">ID: ${id}</div>
+            <div class="mt-2 text-xs text-gray-500 space-y-1">
+              ${metaSource ? `<div><span class="font-semibold">Meta source:</span> ${metaSource}</div>` : ""}
+              ${menuSource ? `<div><span class="font-semibold">Menu source:</span> ${menuSource}</div>` : ""}
+              ${offersSource ? `<div><span class="font-semibold">Offers source:</span> ${offersSource}</div>` : ""}
+            </div>
           </div>
         </div>
 
@@ -80,6 +101,7 @@ async function loadRestaurants() {
           <a href="import-image.html?id=${encodeURIComponent(id)}" class="text-orange-700 underline">Import Menu From Image</a>
           <a href="import.html?id=${encodeURIComponent(id)}" class="text-teal-700 underline">Import Menu From URL</a>
           <a href="import-offers.html?id=${encodeURIComponent(id)}" class="text-pink-700 underline">Import Offers From Website</a>
+          <a href="import-metadata.html?id=${encodeURIComponent(id)}" class="text-indigo-700 underline">Import Basic Info From Website</a>
         </div>
 
         <div class="mt-4">
@@ -100,6 +122,25 @@ async function loadRestaurants() {
         Error loading restaurants
       </div>
     `;
+  }
+}
+
+async function runRescan() {
+  if (!confirm("Run rescan for all restaurants now? This may take a minute.")) return;
+  try {
+    const res = await fetch("/admin/rescan-all", {
+      method: "POST"
+    });
+    const data = await res.json();
+    if (data.ok) {
+      alert("Rescan complete!");
+      loadRestaurants();
+    } else {
+      alert("Rescan failed.");
+    }
+  } catch (e) {
+    console.error("Rescan error:", e);
+    alert("Error running rescan.");
   }
 }
 

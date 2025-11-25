@@ -18,6 +18,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Used for internal HTTP calls (rescan)
+const BASE_INTERNAL_URL =
+  process.env.INTERNAL_BASE_URL || `http://127.0.0.1:${PORT}`;
+
 // ---------------------- Middleware ----------------------
 app.use(cors());
 app.use(express.json());
@@ -402,6 +406,207 @@ app.post("/restaurants/:id", async (req, res) => {
   await saveRestaurants(restaurants);
 
   res.json(updated);
+});
+
+// =========================================================
+// IMPORT BASIC METADATA (HOURS, CONTACT, LINKS) FROM URL
+// =========================================================
+app.post("/import-metadata-from-url", async (req, res) => {
+  try {
+    const { restaurantId, url } = req.body;
+    if (!restaurantId || !url) {
+      return res.status(400).json({ error: "restaurantId and url required" });
+    }
+
+    const response = await fetch(url);
+    const html = await response.text();
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: `
+From this HTML, extract restaurant metadata.
+
+Return STRICT JSON:
+
+{
+  "name": "Restaurant Name or null",
+  "address": "Full address or null",
+  "phone": "Phone number or null",
+  "email": "Email or null",
+  "googleMapsUrl": "Google Maps link or null",
+  "orderingLinks": [
+    { "label": "DoorDash", "url": "..." },
+    { "label": "UberEats", "url": "..." }
+  ],
+  "hours": {
+    "mon": "11:00–22:00 or CLOSED",
+    "tue": "...",
+    "wed": "...",
+    "thu": "...",
+    "fri": "...",
+    "sat": "...",
+    "sun": "..."
+  }
+}
+
+If a field is unknown, put null. HTML:
+${html}
+`
+        }
+      ]
+    });
+
+    let raw = completion.choices[0].message.content.trim();
+    raw = raw.replace(/^```json/i, "").replace(/```$/i, "").trim();
+    const meta = JSON.parse(raw);
+
+    res.json({ metadata: meta });
+  } catch (err) {
+    console.error("import-metadata-from-url failed:", err);
+    res.status(500).json({ error: "Failed to import metadata" });
+  }
+});
+
+// IMPORT OFFERS FROM INSTAGRAM TEXT OR PAGE
+app.post("/import-offers-from-instagram", async (req, res) => {
+  try {
+    const { restaurantId, text, url } = req.body;
+    if (!restaurantId || (!text && !url)) {
+      return res.status(400).json({ error: "restaurantId and text or url required" });
+    }
+
+    let sourceText = text || "";
+    if (!sourceText && url) {
+      const response = await fetch(url);
+      const html = await response.text();
+      sourceText = html;
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: `
+From this Instagram content, extract ONLY promotions / deals / specials.
+
+Return STRICT JSON array like:
+
+[
+  {
+    "title": "Name of promotion",
+    "details": "Description from caption",
+    "code": "Coupon code or null",
+    "startDate": "YYYY-MM-DD or null",
+    "endDate": "YYYY-MM-DD or null",
+    "startTime": "HH:MM or null",
+    "endTime": "HH:MM or null",
+    "daysOfWeek": []
+  }
+]
+
+Content:
+${sourceText}
+`
+        }
+      ]
+    });
+
+    let raw = completion.choices[0].message.content.trim();
+    raw = raw.replace(/^```json/i, "").replace(/```$/i, "").trim();
+    const offers = JSON.parse(raw);
+
+    res.json({ offers });
+  } catch (err) {
+    console.error("import-offers-from-instagram failed:", err);
+    res.status(500).json({ error: "Failed to import offers from Instagram" });
+  }
+});
+
+// =========================================================
+// DAILY RESCAN: refresh metadata, menu & offers for all
+// restaurants that have source URLs configured
+// =========================================================
+app.post("/admin/rescan-all", async (req, res) => {
+  try {
+    const results = [];
+
+    for (const r of Object.values(restaurants)) {
+      const id = r.id;
+      const updates = {};
+
+      // 1) Metadata
+      if (r.metaSourceUrl) {
+        try {
+          const resp = await fetch(`${BASE_INTERNAL_URL}/import-metadata-from-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ restaurantId: id, url: r.metaSourceUrl })
+          });
+          const data = await resp.json();
+          if (!data.error && data.metadata) {
+            Object.assign(updates, data.metadata);
+          }
+        } catch (e) {
+          console.error("Metadata rescan failed for", id, e);
+        }
+      }
+
+      // 2) Menu
+      if (r.menuSourceUrl) {
+        try {
+          const resp = await fetch(`${BASE_INTERNAL_URL}/import-from-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ restaurantId: id, url: r.menuSourceUrl })
+          });
+          const data = await resp.json();
+          if (!data.error && Array.isArray(data.menu)) {
+            updates.menu = data.menu;
+            updates.replace = true; // full replace on rescan
+          }
+        } catch (e) {
+          console.error("Menu rescan failed for", id, e);
+        }
+      }
+
+      // 3) Offers
+      if (r.offersSourceUrl) {
+        try {
+          const resp = await fetch(`${BASE_INTERNAL_URL}/import-offers-from-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ restaurantId: id, url: r.offersSourceUrl })
+          });
+          const data = await resp.json();
+          if (!data.error && Array.isArray(data.offers)) {
+            updates.offers = data.offers;
+            updates.replaceOffers = true;
+          }
+        } catch (e) {
+          console.error("Offers rescan failed for", id, e);
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        restaurants[id] = {
+          ...restaurants[id],
+          ...updates
+        };
+      }
+
+      results.push({ id, updated: Object.keys(updates).length > 0 });
+    }
+
+    await saveRestaurants(restaurants);
+    res.json({ ok: true, results });
+  } catch (err) {
+    console.error("rescan-all failed:", err);
+    res.status(500).json({ error: "Rescan failed" });
+  }
 });
 
 // ---------------------- Chatbot ----------------------

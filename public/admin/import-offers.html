@@ -11,71 +11,44 @@
   <h1 class="text-2xl font-bold mb-4">Import Offers From Website</h1>
 
   <p class="text-sm text-gray-600 mb-4">
-    Paste the URL where the restaurant publishes its specials / promotions. We'll scan the page
-    and extract time-bound offers (like happy hour, limited-time deals, etc.). You can review
-    and then save them to this restaurant.
+    Paste the URL where the restaurant publishes its specials / promotions.
+    We'll scan the page and extract time-bound offers. You can review and then save.
   </p>
 
-  <!-- Restaurant ID -->
   <label class="block font-semibold mb-1">Restaurant ID</label>
-  <input
-    id="restaurantId"
-    type="text"
-    class="w-full border p-2 rounded mb-4"
-    placeholder="pizza-pints"
-  />
+  <input id="restaurantId" class="w-full border p-2 rounded mb-3" />
 
-  <!-- URL -->
-  <label class="block font-semibold mb-1">Website URL with offers</label>
-  <input
-    id="offersUrl"
-    type="text"
-    class="w-full border p-2 rounded mb-4"
-    placeholder="https://example.com/specials"
-  />
+  <label class="block font-semibold mb-1">Offers Page URL</label>
+  <input id="offersUrl" class="w-full border p-2 rounded mb-4"
+         placeholder="https://example.com/specials" />
 
-  <!-- Import Mode -->
   <div class="mb-4">
     <label class="block font-semibold mb-1">Save Mode</label>
-
-    <label class="flex items-center gap-2 mb-1 text-sm">
+    <label class="flex items-center gap-2 text-sm mb-1">
       <input type="radio" name="importMode" value="merge" checked />
       <span>Merge with existing offers (append)</span>
     </label>
-
     <label class="flex items-center gap-2 text-sm">
       <input type="radio" name="importMode" value="replace" />
-      <span>Replace existing offers (overwrite all offers)</span>
+      <span>Replace all existing offers</span>
     </label>
   </div>
 
-  <button
-    onclick="importOffers()"
-    class="w-full bg-blue-600 text-white p-2 rounded mb-4"
-  >
+  <button onclick="importOffers()"
+          class="w-full bg-blue-600 text-white p-2 rounded mb-4">
     Import Offers
   </button>
 
-  <div>
-    <h2 class="font-semibold mb-2">Preview (detected offers)</h2>
-    <pre
-      id="preview"
-      class="w-full bg-gray-50 border p-3 rounded h-64 overflow-auto text-xs"
-    ></pre>
-  </div>
+  <h2 class="font-semibold mb-2">Preview (detected offers)</h2>
+  <pre id="preview" class="bg-gray-50 border rounded p-3 h-64 overflow-auto text-xs"></pre>
 
-  <button
-    id="saveBtn"
-    onclick="saveImportedOffers()"
-    class="w-full bg-green-600 text-white p-2 rounded mt-4 hidden"
-  >
+  <button id="saveBtn"
+          onclick="saveImportedOffers()"
+          class="w-full bg-green-600 text-white p-2 rounded mt-4 hidden">
     Save Offers To Restaurant
   </button>
 
-  <a
-    href="/admin/index.html"
-    class="block text-blue-700 underline text-sm mt-4"
-  >
+  <a href="/admin/index.html" class="block text-blue-700 underline mt-4 text-sm">
     ← Back to Dashboard
   </a>
 </div>
@@ -90,11 +63,11 @@ function prefillRestaurantId() {
     document.getElementById("restaurantId").value = id;
   }
 }
+prefillRestaurantId();
 
 async function importOffers() {
   const restaurantId = document.getElementById("restaurantId").value.trim();
   const url = document.getElementById("offersUrl").value.trim();
-
   const preview = document.getElementById("preview");
   const saveBtn = document.getElementById("saveBtn");
 
@@ -122,7 +95,6 @@ async function importOffers() {
     }
 
     importedOffers = data.offers || [];
-
     preview.textContent = JSON.stringify(importedOffers, null, 2);
 
     if (importedOffers.length > 0) {
@@ -133,13 +105,15 @@ async function importOffers() {
 
   } catch (err) {
     console.error("Import offers error:", err);
-    preview.textContent = "Error: Failed to import offers. See console for details.";
+    preview.textContent = "Error: Failed to import offers.";
     saveBtn.classList.add("hidden");
   }
 }
 
 async function saveImportedOffers() {
   const restaurantId = document.getElementById("restaurantId").value.trim();
+  const url = document.getElementById("offersUrl").value.trim();
+
   if (!restaurantId) {
     alert("Restaurant ID is required.");
     return;
@@ -160,7 +134,8 @@ async function saveImportedOffers() {
 
   const payload = {
     offers: importedOffers,
-    replaceOffers: mode === "replace"
+    replaceOffers: mode === "replace",
+    offersSourceUrl: url  // ⭐ remember source
   };
 
   try {
@@ -180,8 +155,6 @@ async function saveImportedOffers() {
     alert("Error saving offers. Check console.");
   }
 }
-
-prefillRestaurantId();
 </script>
 </body>
 </html>

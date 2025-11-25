@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Import Basic Info From Website</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+<div class="max-w-3xl mx-auto bg-white shadow mt-10 p-6 rounded">
+  <h1 class="text-2xl font-bold mb-4">Import Basic Info From Website</h1>
+
+  <p class="text-sm text-gray-600 mb-4">
+    Paste the URL of the restaurant website (home page or contact page).
+    We'll try to detect name, address, hours, phone, email, Google Maps link,
+    and ordering links.
+  </p>
+
+  <label class="block font-semibold mb-1">Restaurant ID</label>
+  <input id="restaurantId" class="w-full border p-2 rounded mb-3" />
+
+  <label class="block font-semibold mb-1">Website URL</label>
+  <input id="metaUrl" class="w-full border p-2 rounded mb-4"
+         placeholder="https://yourrestaurant.com" />
+
+  <button onclick="importMetadata()"
+          class="w-full bg-blue-600 text-white p-2 rounded mb-4">
+    Import Metadata
+  </button>
+
+  <h2 class="font-semibold mb-2">Preview</h2>
+  <pre id="preview" class="bg-gray-50 border rounded p-3 h-64 overflow-auto text-xs"></pre>
+
+  <button id="saveBtn"
+          onclick="saveMetadata()"
+          class="w-full bg-green-600 text-white p-2 rounded mt-4 hidden">
+    Save To Restaurant
+  </button>
+
+  <a href="/admin/index.html" class="block text-blue-700 underline mt-4 text-sm">
+    ← Back to Dashboard
+  </a>
+</div>
+
+<script>
+let importedMeta = null;
+
+function prefillId() {
+  const p = new URLSearchParams(location.search);
+  const id = p.get("id");
+  if (id) document.getElementById("restaurantId").value = id;
+}
+prefillId();
+
+async function importMetadata() {
+  const restaurantId = document.getElementById("restaurantId").value.trim();
+  const url = document.getElementById("metaUrl").value.trim();
+  const preview = document.getElementById("preview");
+  const saveBtn = document.getElementById("saveBtn");
+
+  if (!restaurantId || !url) {
+    preview.textContent = "Restaurant ID and URL required.";
+    saveBtn.classList.add("hidden");
+    return;
+  }
+
+  preview.textContent = "Importing...";
+  saveBtn.classList.add("hidden");
+
+  try {
+    const res = await fetch("/import-metadata-from-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restaurantId, url })
+    });
+    const data = await res.json();
+    if (data.error) {
+      preview.textContent = "Error: " + data.error;
+      return;
+    }
+    importedMeta = data.metadata;
+    preview.textContent = JSON.stringify(importedMeta, null, 2);
+    saveBtn.classList.remove("hidden");
+  } catch (e) {
+    console.error(e);
+    preview.textContent = "Error importing metadata";
+  }
+}
+
+async function saveMetadata() {
+  if (!importedMeta) return alert("Nothing to save");
+  const restaurantId = document.getElementById("restaurantId").value.trim();
+  const url = document.getElementById("metaUrl").value.trim();
+
+  const payload = {
+    ...importedMeta,
+    metaSourceUrl: url  // ⭐ remember where we got it from
+  };
+
+  try {
+    const res = await fetch(`/restaurants/${encodeURIComponent(restaurantId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) alert("Saved!");
+    else alert("Failed to save");
+  } catch (e) {
+    console.error(e);
+    alert("Failed to save");
+  }
+}
+</script>
+</body>
+</html>
