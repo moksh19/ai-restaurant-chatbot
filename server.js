@@ -21,18 +21,17 @@ const PORT = process.env.PORT || 3000;
 // ------------------------------------
 // Middleware
 // ------------------------------------
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(process.cwd(), "public/admin/index.html"));
-});
-
-
 app.use(cors());
 app.use(express.json());
 
 // Static
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/admin", express.static(path.join(__dirname, "public/admin")));
+
+// Redirect root to admin dashboard
+app.get("/", (req, res) => {
+  res.redirect("/admin/index.html");
+});
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -271,7 +270,7 @@ function mergeMenus(oldMenu, newMenu) {
 // RESTAURANTS ROUTES
 // =========================================================
 
-// ✅ This is the one the dashboard calls
+// used by dashboard
 app.get("/restaurants", (req, res) => {
   res.json(Object.values(restaurants));
 });
@@ -283,8 +282,15 @@ app.post("/restaurants/:id", async (req, res) => {
   const existing = restaurants[id] || { id, menu: [], offers: [], faq: [] };
 
   let finalMenu = existing.menu;
+
   if (Array.isArray(data.menu)) {
-    finalMenu = mergeMenus(existing.menu, data.menu);
+    if (data.replace) {
+      // FULL REPLACE mode
+      finalMenu = data.menu;
+    } else {
+      // MERGE mode (default)
+      finalMenu = mergeMenus(existing.menu, data.menu);
+    }
   }
 
   const updated = {
@@ -294,6 +300,9 @@ app.post("/restaurants/:id", async (req, res) => {
     menu: finalMenu,
   };
 
+  // prevent replace flag from being accidentally stored
+  delete updated.replace;
+
   restaurants[id] = updated;
   await saveRestaurants(restaurants);
 
@@ -301,7 +310,7 @@ app.post("/restaurants/:id", async (req, res) => {
 });
 
 // =========================================================
- // CHATBOT
+// CHATBOT
 // =========================================================
 
 app.post("/chat", async (req, res) => {

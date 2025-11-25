@@ -2,39 +2,51 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Import Menu</title>
+  <title>Import Menu From Website</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-
 <body class="bg-gray-100">
 
 <div class="max-w-3xl mx-auto bg-white shadow mt-10 p-6 rounded">
   <h1 class="text-2xl font-bold mb-6">Import Menu From Website</h1>
 
-  <!-- Restaurant ID -->
   <label class="block font-semibold mb-1">Restaurant ID</label>
   <input id="restaurantId"
          type="text"
          class="w-full border p-2 rounded mb-4"
          placeholder="pizza-pints" />
 
-  <!-- Website URL -->
   <label class="block font-semibold mb-1">Website URL</label>
-  <input id="url"
+  <input id="websiteUrl"
          type="text"
          class="w-full border p-2 rounded mb-4"
          placeholder="https://example.com/menu" />
+
+  <!-- Import Mode -->
+  <div class="mb-4">
+    <label class="block font-semibold mb-1">Import Mode</label>
+
+    <label class="flex items-center gap-2 mb-1">
+      <input type="radio" name="importMode" value="merge" checked />
+      <span>Merge with existing menu (default)</span>
+    </label>
+
+    <label class="flex items-center gap-2">
+      <input type="radio" name="importMode" value="replace" />
+      <span>Replace entire menu</span>
+    </label>
+  </div>
 
   <button onclick="importMenu()"
           class="w-full bg-blue-600 text-white p-3 rounded mb-4">
     Import Menu
   </button>
 
-  <!-- OUTPUT BOX -->
-  <pre id="output" class="w-full bg-gray-50 border p-4 rounded h-64 overflow-auto text-sm"></pre>
+  <pre id="output"
+       class="w-full bg-gray-50 border p-4 rounded h-64 overflow-auto text-sm"></pre>
 
-  <!-- SAVE BUTTON -->
-  <button id="saveBtn" onclick="saveImportedMenu()"
+  <button id="saveBtn"
+          onclick="saveImportedMenu()"
           class="w-full bg-green-600 text-white p-3 rounded mt-4 hidden">
     Save to Restaurant
   </button>
@@ -47,9 +59,17 @@
 <script>
 let importedMenu = null;
 
+function prefillRestaurantId() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+  if (id) {
+    document.getElementById("restaurantId").value = id;
+  }
+}
+
 async function importMenu() {
   const restaurantId = document.getElementById("restaurantId").value;
-  const url = document.getElementById("url").value;
+  const url = document.getElementById("websiteUrl").value;
 
   if (!restaurantId || !url) {
     document.getElementById("output").textContent =
@@ -57,26 +77,23 @@ async function importMenu() {
     return;
   }
 
-  const response = await fetch("/import-from-url", {
+  const res = await fetch("/import-from-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ restaurantId, url })
   });
 
-  const data = await response.json();
+  const data = await res.json();
 
   if (data.error) {
-    document.getElementById("output").textContent =
-      "Error: " + data.error;
+    document.getElementById("output").textContent = "Error: " + data.error;
     document.getElementById("saveBtn").classList.add("hidden");
     return;
   }
 
   importedMenu = data.menu;
-
   document.getElementById("output").textContent =
     JSON.stringify(importedMenu, null, 2);
-
   document.getElementById("saveBtn").classList.remove("hidden");
 }
 
@@ -88,9 +105,21 @@ async function saveImportedMenu() {
     return;
   }
 
-  const payload = { menu: importedMenu };
+  const mode = document.querySelector('input[name="importMode"]:checked').value;
 
-  const res = await fetch(`/restaurants/${restaurantId}`, {
+  if (mode === "replace") {
+    const sure = confirm(
+      "This will REPLACE the existing menu for this restaurant. Continue?"
+    );
+    if (!sure) return;
+  }
+
+  const payload = { menu: importedMenu };
+  if (mode === "replace") {
+    payload.replace = true;
+  }
+
+  const res = await fetch(`/restaurants/${encodeURIComponent(restaurantId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -102,6 +131,8 @@ async function saveImportedMenu() {
     alert("Error saving the imported menu.");
   }
 }
+
+prefillRestaurantId();
 </script>
 
 </body>
