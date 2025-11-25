@@ -1,87 +1,115 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <title>Restaurant Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-
 <body class="bg-gray-100">
 
-<div class="max-w-4xl mx-auto bg-white shadow mt-10 p-6 rounded">
+<div class="max-w-5xl mx-auto mt-10 bg-white shadow p-6 rounded">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold">Restaurant Dashboard</h1>
-
     <div class="flex gap-3">
-      <a href="add.html" class="bg-blue-600 text-white px-4 py-2 rounded">+ Add Restaurant</a>
-      <a href="/backup" class="bg-gray-800 text-white px-4 py-2 rounded">Download Backup (JSON)</a>
+      <a
+        href="add.html"
+        class="bg-blue-600 text-white px-4 py-2 rounded"
+      >
+        + Add Restaurant
+      </a>
+      <a
+        href="/admin/backup"
+        class="bg-slate-800 text-white px-4 py-2 rounded"
+      >
+        Download Backup (JSON)
+      </a>
     </div>
   </div>
 
-  <h2 class="text-2xl font-semibold mb-3">Current Restaurants</h2>
+  <h2 class="text-xl font-semibold mb-4">Current Restaurants</h2>
 
-  <div id="restaurantsList" class="space-y-4"></div>
+  <div id="restaurantList" class="space-y-4">
+    <!-- Filled by JS -->
+  </div>
 </div>
 
-<!-- ====================== -->
-<!--     MAIN SCRIPT        -->
-<!-- ====================== -->
-
 <script>
-const BACKEND_URL = window.location.origin;
-
 async function loadRestaurants() {
-  const list = document.getElementById("restaurantsList");
-  list.innerHTML = "Loading...";
+  const list = document.getElementById("restaurantList");
 
   try {
     const res = await fetch("/restaurants");
+    if (!res.ok) {
+      throw new Error("HTTP " + res.status);
+    }
+
     const data = await res.json();
+    const restaurants = Array.isArray(data) ? data : Object.values(data);
+
+    if (!restaurants || restaurants.length === 0) {
+      list.innerHTML = '<div class="text-gray-500 text-sm">No restaurants yet. Click "Add Restaurant" to create one.</div>';
+      return;
+    }
 
     list.innerHTML = "";
 
-    data.forEach(r => {
+    const origin = window.location.origin;
+
+    restaurants.forEach((r) => {
+      const id = r.id || "";
+      const name = r.name || id || "Unnamed restaurant";
+
       const card = document.createElement("div");
       card.className = "border rounded p-4 bg-gray-50";
 
+      // Snippet for embedding widget on their site.
+      // IMPORTANT: escape </script> as <\/script> so it doesn’t break this script block.
+      const snippet = `<script
+  src="${origin}/widget.js"
+  data-restaurant-id="${id}"
+  data-backend-url="${origin}"
+><\\/script>`;
+
       card.innerHTML = `
-        <div class="text-xl font-semibold">${r.name || r.id}</div>
-        <div class="text-gray-600 text-sm">ID: ${r.id}</div>
-
-        <div class="mt-3 flex gap-4 text-sm">
-          <a href="basic.html?id=${encodeURIComponent(r.id)}" class="text-blue-700 underline">Edit Basic</a>
-          <a href="menu.html?id=${encodeURIComponent(r.id)}" class="text-green-700 underline">Edit Menu</a>
-          <a href="offers.html?id=${encodeURIComponent(r.id)}" class="text-purple-700 underline">Edit Offers</a>
-          <a href="import-image.html?id=${encodeURIComponent(r.id)}" class="text-orange-700 underline">Import Menu From Image</a>
-          <a href="import.html?id=${encodeURIComponent(r.id)}" class="text-teal-700 underline">Import Menu From URL</a>
-        <a href="import-offers.html?id=${encodeURIComponent(id)}"
-   class="text-pink-700 underline">
-  Import Offers From Website
-</a>
-
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="text-xl font-semibold">${name}</div>
+            <div class="text-sm text-gray-600">ID: ${id}</div>
           </div>
+        </div>
 
-        <details class="mt-4 bg-white border p-3 rounded">
-          <summary class="cursor-pointer text-sm font-semibold">Embed Code</summary>
-          <pre class="embed-snippet bg-gray-900 text-green-300 text-xs p-2 mt-2 rounded"></pre>
-        </details>
+        <div class="mt-3 flex flex-wrap gap-4 text-sm">
+          <a href="basic.html?id=${encodeURIComponent(id)}" class="text-blue-700 underline">Edit Basic</a>
+          <a href="menu.html?id=${encodeURIComponent(id)}" class="text-green-700 underline">Edit Menu</a>
+          <a href="offers.html?id=${encodeURIComponent(id)}" class="text-purple-700 underline">Edit Offers</a>
+          <a href="import-image.html?id=${encodeURIComponent(id)}" class="text-orange-700 underline">Import Menu From Image</a>
+          <a href="import.html?id=${encodeURIComponent(id)}" class="text-teal-700 underline">Import Menu From URL</a>
+          <a href="import-offers.html?id=${encodeURIComponent(id)}" class="text-pink-700 underline">Import Offers From Website</a>
+        </div>
+
+        <div class="mt-4">
+          <div class="text-sm font-semibold mb-1">Embed Code (add to restaurant website):</div>
+          <pre class="embed-snippet bg-gray-900 text-green-200 text-xs p-3 rounded overflow-auto"></pre>
+        </div>
       `;
 
-      const snippet = `<script src="${BACKEND_URL}/widget.js"
-  data-restaurant-id="${r.id}"
-  data-backend-url="${BACKEND_URL}"><\/script>`;
-
-      card.querySelector(".embed-snippet").textContent = snippet;
+      const pre = card.querySelector(".embed-snippet");
+      pre.textContent = snippet;
 
       list.appendChild(card);
     });
-
   } catch (err) {
-    list.innerHTML = `<div class="bg-red-100 text-red-700 p-3 rounded">Error loading restaurants</div>`;
+    console.error("Error loading restaurants:", err);
+    list.innerHTML = `
+      <div class="bg-red-100 text-red-700 p-3 rounded">
+        Error loading restaurants
+      </div>
+    `;
   }
 }
 
-loadRestaurants();
+document.addEventListener("DOMContentLoaded", loadRestaurants);
 </script>
+
 </body>
 </html>
