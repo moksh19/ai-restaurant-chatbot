@@ -7,6 +7,7 @@
   </head>
   <body class="bg-gray-100">
     <div class="max-w-5xl mx-auto mt-8">
+      <!-- Header -->
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">Restaurant Dashboard</h1>
         <div class="flex gap-3">
@@ -104,13 +105,13 @@
               </details>
             `;
 
-            // Build the embed snippet safely
+            // Build the embed snippet safely (avoid closing this script tag)
             const snippet = `
 <script
   src="https://ai-restaurant-chatbot.onrender.com/widget.js?v=3"
   data-restaurant-id="${id}"
   data-backend-url="https://ai-restaurant-chatbot.onrender.com"
-><\/script>`.trim(); // note <\/script> so it doesn’t break this script block
+><\\/script>`.trim();
 
             const pre = card.querySelector(".embed-snippet");
             pre.textContent = snippet;
