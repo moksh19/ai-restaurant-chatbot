@@ -18,11 +18,19 @@
             <span class="text-xl leading-none">+</span>
             Add Restaurant
           </a>
+
           <button
             id="btnBackup"
             class="bg-slate-800 text-white px-4 py-2 rounded shadow text-sm"
           >
             Download Backup (JSON)
+          </button>
+
+          <button
+            id="btnRescanAll"
+            class="bg-amber-600 text-white px-4 py-2 rounded shadow text-sm"
+          >
+            Rescan All
           </button>
         </div>
       </div>
@@ -77,9 +85,15 @@
                 <a href="/admin/basic.html?id=${encodeURIComponent(
                   id
                 )}" class="text-blue-600 hover:underline">Edit Basic</a>
+
+                <a href="/admin/import-metadata.html?id=${encodeURIComponent(
+                  id
+                )}" class="text-sky-700 hover:underline">Import Basic From Website</a>
+
                 <a href="/admin/menu.html?id=${encodeURIComponent(
                   id
                 )}" class="text-green-700 hover:underline">Edit Menu</a>
+
                 <a href="/admin/offers.html?id=${encodeURIComponent(
                   id
                 )}" class="text-purple-700 hover:underline">Edit Offers</a>
@@ -112,7 +126,6 @@
               </details>
             `;
 
-            // Build the embed snippet safely (avoid closing this script tag)
             const snippet = `
 <script
   src="https://ai-restaurant-chatbot.onrender.com/widget.js?v=3"
@@ -133,10 +146,45 @@
         }
       }
 
+      // Download backup
       document
         .getElementById("btnBackup")
         .addEventListener("click", () => {
           window.location.href = "/admin/backup";
+        });
+
+      // Rescan All button
+      document
+        .getElementById("btnRescanAll")
+        .addEventListener("click", async () => {
+          const btn = document.getElementById("btnRescanAll");
+          const confirmRescan = confirm(
+            "Rescan all restaurants using saved source URLs (metadata, menu, offers)? This may replace some data."
+          );
+          if (!confirmRescan) return;
+
+          btn.disabled = true;
+          btn.textContent = "Rescanning…";
+
+          try {
+            const resp = await fetch("/admin/rescan-all", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+              alert("Rescan failed: " + (data.error || "Unknown error"));
+            } else {
+              alert("Rescan complete.\nCheck console for details.");
+              console.log("Rescan results:", data);
+            }
+          } catch (e) {
+            console.error("Rescan error", e);
+            alert("Rescan failed.");
+          }
+
+          btn.disabled = false;
+          btn.textContent = "Rescan All";
         });
 
       loadRestaurants();

@@ -1,141 +1,198 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8" />
-  <title>Import Menu From Image</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Import Menu From Image</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div class="max-w-3xl mx-auto bg-white shadow mt-8 p-6 rounded">
+      <h1 class="text-2xl font-bold mb-2">Import Menu From Image / PDF</h1>
+      <div id="restaurantInfo" class="text-sm text-gray-600 mb-4">
+        Loading restaurant...
+      </div>
 
-<body class="bg-gray-100">
-<div class="max-w-3xl mx-auto bg-white shadow mt-10 p-6 rounded">
-  <h1 class="text-2xl font-bold mb-6">Import Menu From Image / Screenshot</h1>
+      <div class="mb-4 border rounded p-4 bg-slate-50">
+        <h2 class="font-semibold mb-2">Upload Image or PDF Screenshot</h2>
+        <p class="text-xs text-gray-600 mb-2">
+          Upload a clear picture or PDF screenshot of the menu.
+          The AI will try to extract categories, items, prices and notes.
+        </p>
 
-  <label class="block font-semibold mb-1">Restaurant ID</label>
-  <input id="restaurantId"
-         type="text"
-         class="w-full border p-2 rounded mb-4"
-         placeholder="pizza-pints" />
+        <input
+          id="imageFile"
+          type="file"
+          accept="image/*,.pdf"
+          class="mb-3 text-sm"
+        />
 
-  <label class="block font-semibold mb-1">Menu Image (JPG/PNG)</label>
-  <input id="menuImage"
-         type="file"
-         accept="image/*"
-         class="w-full border p-2 rounded mb-4" />
+        <div class="mt-3 flex items-center gap-3">
+          <button
+            id="btnImport"
+            class="bg-orange-700 text-white px-4 py-2 rounded text-sm"
+          >
+            Import Menu
+          </button>
+          <span id="importStatus" class="text-xs text-gray-600"></span>
+        </div>
+      </div>
 
-  <!-- Import Mode -->
-  <div class="mb-4">
-    <label class="block font-semibold mb-1">Import Mode</label>
+      <div class="mb-4">
+        <h2 class="font-semibold mb-2">Imported Menu Preview</h2>
+        <pre
+          id="menuPreview"
+          class="border rounded bg-slate-50 p-3 text-xs overflow-x-auto min-h-[80px]"
+        ></pre>
+      </div>
 
-    <label class="flex items-center gap-2 mb-1">
-      <input type="radio" name="importMode" value="merge" checked />
-      <span>Merge with existing menu (default)</span>
-    </label>
+      <div class="mb-4 flex items-center gap-2">
+        <input
+          id="replaceMenu"
+          type="checkbox"
+          class="h-4 w-4"
+        />
+        <label for="replaceMenu" class="text-sm">
+          Replace existing menu instead of merging
+        </label>
+      </div>
 
-    <label class="flex items-center gap-2">
-      <input type="radio" name="importMode" value="replace" />
-      <span>Replace entire menu</span>
-    </label>
-  </div>
+      <div class="flex gap-3 items-center">
+        <button
+          id="btnSave"
+          class="bg-blue-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
+          disabled
+        >
+          Save Menu to Restaurant
+        </button>
+        <a href="/admin/index.html" class="text-blue-600 underline text-sm">
+          Back to Dashboard
+        </a>
+        <span id="saveStatus" class="text-xs text-gray-600"></span>
+      </div>
+    </div>
 
-  <button onclick="importFromImage()"
-          class="w-full bg-blue-600 text-white p-3 rounded mb-4">
-    Import From Image
-  </button>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const restaurantId = params.get("id");
 
-  <pre id="output" class="w-full bg-gray-50 border p-4 rounded h-64 overflow-auto text-sm"></pre>
+      const infoEl = document.getElementById("restaurantInfo");
+      const importStatusEl = document.getElementById("importStatus");
+      const previewEl = document.getElementById("menuPreview");
+      const saveBtn = document.getElementById("btnSave");
+      const saveStatusEl = document.getElementById("saveStatus");
 
-  <button id="saveBtn" onclick="saveImportedMenu()"
-          class="w-full bg-green-600 text-white p-3 rounded mt-4 hidden">
-    Save to Restaurant
-  </button>
+      let importedMenu = [];
 
-  <a href="/admin/index.html" class="block text-blue-700 mt-4 underline">
-    Back to Dashboard
-  </a>
-</div>
+      if (!restaurantId) {
+        document.body.innerHTML =
+          '<div class="max-w-xl mx-auto mt-10 text-red-600 font-semibold">Missing ?id= in URL.</div>';
+      } else {
+        infoEl.textContent = "Restaurant ID: " + restaurantId;
+        loadRestaurantName();
+      }
 
-<script>
-let importedMenu = null;
+      async function loadRestaurantName() {
+        try {
+          const res = await fetch("/restaurants");
+          if (!res.ok) return;
+          const all = await res.json();
+          const r = all.find((x) => x.id === restaurantId);
+          if (r) {
+            infoEl.textContent =
+              (r.name || "Restaurant") + " (ID: " + restaurantId + ")";
+          }
+        } catch (e) {
+          console.warn("Could not load restaurant name", e);
+        }
+      }
 
-function prefillRestaurantId() {
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get("id");
-  if (id) {
-    document.getElementById("restaurantId").value = id;
-  }
-}
+      async function importFromImage() {
+        const input = document.getElementById("imageFile");
+        if (!input.files || !input.files[0]) {
+          alert("Please choose an image or PDF file.");
+          return;
+        }
 
-async function importFromImage() {
-  const restaurantId = document.getElementById("restaurantId").value;
-  const fileInput = document.getElementById("menuImage");
-  const file = fileInput.files[0];
+        importStatusEl.textContent = "Importing menu from image...";
+        previewEl.textContent = "";
+        saveBtn.disabled = true;
+        saveStatusEl.textContent = "";
+        importedMenu = [];
 
-  if (!restaurantId || !file) {
-    document.getElementById("output").textContent =
-      "Error: restaurantId and an image file are required";
-    return;
-  }
+        const form = new FormData();
+        form.append("image", input.files[0]);
+        form.append("restaurantId", restaurantId);
 
-  const formData = new FormData();
-  formData.append("restaurantId", restaurantId);
-  formData.append("image", file);
+        try {
+          const res = await fetch("/import-from-image", {
+            method: "POST",
+            body: form,
+          });
+          const data = await res.json();
+          if (!res.ok || !Array.isArray(data.menu)) {
+            throw new Error(data.error || "Image import failed");
+          }
 
-  const res = await fetch("/import-from-image", {
-    method: "POST",
-    body: formData
-  });
+          importedMenu = data.menu;
+          importStatusEl.textContent =
+            "Imported " + importedMenu.length + " category(ies). Review below.";
+          previewEl.textContent = JSON.stringify(importedMenu, null, 2);
+          saveBtn.disabled = false;
+        } catch (err) {
+          console.error("Image menu import error:", err);
+          importStatusEl.textContent = "Error importing menu from image.";
+          previewEl.textContent = "";
+          saveBtn.disabled = true;
+        }
+      }
 
-  const data = await res.json();
+      async function saveMenu() {
+        if (!importedMenu || importedMenu.length === 0) {
+          alert("No imported menu to save.");
+          return;
+        }
 
-  if (data.error) {
-    document.getElementById("output").textContent = "Error: " + data.error;
-    document.getElementById("saveBtn").classList.add("hidden");
-    return;
-  }
+        const replace = document.getElementById("replaceMenu").checked;
 
-  importedMenu = data.menu;
-  document.getElementById("output").textContent =
-    JSON.stringify(importedMenu, null, 2);
-  document.getElementById("saveBtn").classList.remove("hidden");
-}
+        saveStatusEl.textContent = "Saving menu...";
+        saveBtn.disabled = true;
 
-async function saveImportedMenu() {
-  const restaurantId = document.getElementById("restaurantId").value;
+        try {
+          const res = await fetch("/restaurants/" + restaurantId, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              menu: importedMenu,
+              replace,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Save failed");
+          }
+          saveStatusEl.textContent = replace
+            ? "Saved. Existing menu was replaced."
+            : "Saved. Imported menu was merged with existing.";
 
-  if (!importedMenu) {
-    alert("No imported menu available.");
-    return;
-  }
+          saveBtn.disabled = false;
+        } catch (err) {
+          console.error("Save image-menu error:", err);
+          saveStatusEl.textContent = "Error saving menu.";
+          saveBtn.disabled = false;
+        }
+      }
 
-  const mode = document.querySelector('input[name="importMode"]:checked').value;
+      document
+        .getElementById("btnImport")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          importFromImage();
+        });
 
-  if (mode === "replace") {
-    const sure = confirm(
-      "This will REPLACE the existing menu for this restaurant. Continue?"
-    );
-    if (!sure) return;
-  }
-
-  const payload = { menu: importedMenu };
-  if (mode === "replace") {
-    payload.replace = true;
-  }
-
-  const res = await fetch(`/restaurants/${encodeURIComponent(restaurantId)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  if (res.ok) {
-    alert("Menu imported and saved successfully!");
-  } else {
-    alert("Error saving the imported menu.");
-  }
-}
-
-prefillRestaurantId();
-</script>
-
-</body>
+      saveBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        saveMenu();
+      });
+    </script>
+  </body>
 </html>

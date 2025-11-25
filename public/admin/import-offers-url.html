@@ -103,7 +103,7 @@
           if (!res.ok) return;
           const all = await res.json();
           const r = all.find((x) => x.id === restaurantId);
-          if (r) {
+        if (r) {
             infoEl.textContent =
               (r.name || "Restaurant") + " (ID: " + restaurantId + ")";
           }
@@ -165,6 +165,7 @@
         }
 
         const replace = document.getElementById("replaceOffers").checked;
+        const url = document.getElementById("offersUrl").value.trim();
 
         saveStatusEl.textContent = "Saving offers...";
         saveBtn.disabled = true;
@@ -176,6 +177,7 @@
             body: JSON.stringify({
               offers: importedOffers,
               replaceOffers: replace,
+              offersSourceUrl: url, // ⭐ remember source for rescan
             }),
           });
 

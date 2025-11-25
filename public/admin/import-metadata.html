@@ -16,29 +16,29 @@
     and ordering links.
   </p>
 
-  <label class="block font-semibold mb-1">Restaurant ID</label>
-  <input id="restaurantId" class="w-full border p-2 rounded mb-3" />
+  <label class="block text-sm font-semibold mb-1">Restaurant ID</label>
+  <input id="restaurantId" class="w-full border p-2 rounded mb-3 text-sm" />
 
-  <label class="block font-semibold mb-1">Website URL</label>
-  <input id="metaUrl" class="w-full border p-2 rounded mb-4"
-         placeholder="https://yourrestaurant.com" />
+  <label class="block text-sm font-semibold mb-1">Website URL</label>
+  <input id="metaUrl" class="w-full border p-2 rounded mb-3 text-sm"
+         placeholder="https://thepizzapints.com" />
 
-  <button onclick="importMetadata()"
-          class="w-full bg-blue-600 text-white p-2 rounded mb-4">
-    Import Metadata
+  <button id="btnImport"
+          class="bg-slate-800 text-white px-4 py-2 rounded text-sm mb-4">
+    Import From Website
   </button>
 
-  <h2 class="font-semibold mb-2">Preview</h2>
-  <pre id="preview" class="bg-gray-50 border rounded p-3 h-64 overflow-auto text-xs"></pre>
+  <h2 class="text-lg font-semibold mb-2">Preview</h2>
+  <pre id="preview"
+       class="border rounded bg-slate-50 p-3 text-xs overflow-x-auto min-h-[120px] mb-4"></pre>
 
-  <button id="saveBtn"
-          onclick="saveMetadata()"
-          class="w-full bg-green-600 text-white p-2 rounded mt-4 hidden">
+  <button id="btnSave"
+          class="bg-blue-600 text-white px-4 py-2 rounded text-sm mb-2"
+          disabled>
     Save To Restaurant
   </button>
-
-  <a href="/admin/index.html" class="block text-blue-700 underline mt-4 text-sm">
-    ← Back to Dashboard
+  <a href="/admin/index.html" class="text-blue-600 underline text-sm ml-2">
+    Back to Dashboard
   </a>
 </div>
 
@@ -56,41 +56,47 @@ async function importMetadata() {
   const restaurantId = document.getElementById("restaurantId").value.trim();
   const url = document.getElementById("metaUrl").value.trim();
   const preview = document.getElementById("preview");
-  const saveBtn = document.getElementById("saveBtn");
+  const saveBtn = document.getElementById("btnSave");
 
   if (!restaurantId || !url) {
-    preview.textContent = "Restaurant ID and URL required.";
-    saveBtn.classList.add("hidden");
+    alert("Please enter both restaurant ID and URL.");
     return;
   }
 
-  preview.textContent = "Importing...";
-  saveBtn.classList.add("hidden");
+  preview.textContent = "Importing metadata...";
+  saveBtn.disabled = true;
+  importedMeta = null;
 
   try {
     const res = await fetch("/import-metadata-from-url", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ restaurantId, url })
+      body: JSON.stringify({ restaurantId, url }),
     });
     const data = await res.json();
-    if (data.error) {
-      preview.textContent = "Error: " + data.error;
+    if (!res.ok || !data.metadata) {
+      preview.textContent =
+        data.error || "Failed to import metadata from website.";
       return;
     }
     importedMeta = data.metadata;
     preview.textContent = JSON.stringify(importedMeta, null, 2);
-    saveBtn.classList.remove("hidden");
+    saveBtn.disabled = false;
   } catch (e) {
     console.error(e);
-    preview.textContent = "Error importing metadata";
+    preview.textContent = "Error importing metadata.";
+    saveBtn.disabled = true;
   }
 }
 
 async function saveMetadata() {
-  if (!importedMeta) return alert("Nothing to save");
   const restaurantId = document.getElementById("restaurantId").value.trim();
   const url = document.getElementById("metaUrl").value.trim();
+
+  if (!restaurantId || !importedMeta) {
+    alert("Nothing to save.");
+    return;
+  }
 
   const payload = {
     ...importedMeta,
@@ -98,7 +104,7 @@ async function saveMetadata() {
   };
 
   try {
-    const res = await fetch(`/restaurants/${encodeURIComponent(restaurantId)}`, {
+    const res = await fetch("/restaurants/" + restaurantId, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -110,6 +116,16 @@ async function saveMetadata() {
     alert("Failed to save");
   }
 }
+
+document.getElementById("btnImport").addEventListener("click", (e) => {
+  e.preventDefault();
+  importMetadata();
+});
+
+document.getElementById("btnSave").addEventListener("click", (e) => {
+  e.preventDefault();
+  saveMetadata();
+});
 </script>
 </body>
 </html>

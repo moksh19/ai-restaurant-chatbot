@@ -49,7 +49,7 @@ async function loadRestaurant() {
   }
 
   document.getElementById("restaurantName").textContent =
-    restaurant.name + " (ID: " + restaurant.id + ")";
+    (restaurant.name || "Restaurant") + " (ID: " + restaurant.id + ")";
 
   renderMenu();
 }
@@ -88,7 +88,7 @@ function renderMenu() {
     const itemsContainer = card.querySelector("#items-" + sectionIndex);
     (section.items || []).forEach((item, itemIndex) => {
       const row = document.createElement("div");
-      row.className = "grid grid-cols-3 gap-2 items-start";
+      row.className = "grid grid-cols-3 gap-2 items-center";
 
       row.innerHTML = `
         <input type="text" value="${item.name || ""}" placeholder="Item name"
@@ -104,7 +104,6 @@ function renderMenu() {
                data-field="price" />
 
         <div class="flex flex-col gap-2">
-
           <input type="text" value="${item.notes || ""}" placeholder="Notes"
                  class="border p-1 rounded text-sm flex-1"
                  data-section-index="${sectionIndex}"
@@ -113,7 +112,7 @@ function renderMenu() {
 
           <img src="${item.image || ""}"
                class="h-12 w-12 object-cover rounded border"
-               style="display:${item.image ? 'block' : 'none'}">
+               style="display:${item.image ? "block" : "none"}">
 
           <input type="file" class="upload-image"
                  data-section-index="${sectionIndex}"
@@ -124,9 +123,9 @@ function renderMenu() {
                   data-item-index="${itemIndex}">
             ✕ Remove
           </button>
-
         </div>
       `;
+
       itemsContainer.appendChild(row);
     });
   });
@@ -135,7 +134,7 @@ function renderMenu() {
 }
 
 function attachMenuEventHandlers() {
-  // Category name change
+  // Category name
   document.querySelectorAll('input[data-field="category"]').forEach(input => {
     input.addEventListener("input", (e) => {
       const idx = parseInt(e.target.getAttribute("data-section-index"));
@@ -143,7 +142,7 @@ function attachMenuEventHandlers() {
     });
   });
 
-  // Item fields change
+  // Item fields
   ["name", "price", "notes"].forEach(field => {
     document.querySelectorAll(`input[data-field="${field}"]`).forEach(input => {
       input.addEventListener("input", (e) => {
@@ -161,7 +160,7 @@ function attachMenuEventHandlers() {
       if (!Array.isArray(restaurant.menu[sIdx].items)) {
         restaurant.menu[sIdx].items = [];
       }
-      restaurant.menu[sIdx].items.push({ name: "", price: "", notes: "", image: "" });
+      restaurant.menu[sIdx].items.push({ name: "", price: "", notes: "" });
       renderMenu();
     });
   });
@@ -201,19 +200,23 @@ function attachMenuEventHandlers() {
 
       const data = await res.json();
       restaurant.menu[s].items[i].image = data.url;
-
       renderMenu();
     });
   });
 }
 
 function addCategory() {
+  if (!Array.isArray(restaurant.menu)) {
+    restaurant.menu = [];
+  }
   restaurant.menu.push({ category: "", items: [] });
   renderMenu();
 }
 
 async function saveMenu() {
-  const payload = { menu: restaurant.menu };
+  const payload = {
+    menu: restaurant.menu
+  };
 
   const res = await fetch(`/restaurants/${restaurant.id}`, {
     method: "POST",

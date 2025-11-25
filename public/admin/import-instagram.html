@@ -15,7 +15,7 @@
       <div class="mb-4 border rounded p-4 bg-slate-50">
         <h2 class="font-semibold mb-2">Instagram Source</h2>
         <p class="text-xs text-gray-600 mb-2">
-          You can either paste an Instagram post / reel / profile URL, or raw
+          You can either paste an Instagram post/reel/profile URL, or raw
           caption text. If both are provided, caption text is used first.
         </p>
 
@@ -203,7 +203,6 @@
             ? "Saved. Existing offers were replaced."
             : "Saved. Imported offers were appended to existing ones.";
 
-          // keep button enabled if they want to tweak again
           saveBtn.disabled = false;
         } catch (err) {
           console.error("Save offers error:", err);

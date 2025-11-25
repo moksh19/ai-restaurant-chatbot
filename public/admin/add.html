@@ -1,51 +1,69 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8"/>
-  <title>Add Restaurant</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Add Restaurant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div class="max-w-xl mx-auto bg-white shadow mt-10 p-6 rounded">
+      <h1 class="text-2xl font-bold mb-4">Add Restaurant</h1>
 
-<div class="max-w-xl mx-auto bg-white shadow mt-10 p-6 rounded">
-  <h1 class="text-2xl font-bold mb-4">Add Restaurant</h1>
+      <label class="block text-sm font-medium mb-1">Restaurant ID</label>
+      <input
+        id="id"
+        class="border rounded w-full p-2 text-sm mb-3"
+        placeholder="pizza-pints"
+      />
 
-  <label class="block font-semibold">Restaurant ID</label>
-  <input id="id" class="border p-2 w-full mb-3"/>
+      <label class="block text-sm font-medium mb-1">Name</label>
+      <input
+        id="name"
+        class="border rounded w-full p-2 text-sm mb-4"
+        placeholder="Pizza &amp; Pints"
+      />
 
-  <label class="block font-semibold">Name</label>
-  <input id="name" class="border p-2 w-full mb-3"/>
+      <button
+        id="btnSave"
+        class="bg-blue-600 text-white px-4 py-2 rounded text-sm"
+      >
+        Create
+      </button>
 
-  <label class="block font-semibold">Hours</label>
-  <input id="hours" class="border p-2 w-full mb-3"/>
+      <a href="/admin/index.html" class="ml-3 text-blue-600 underline text-sm">
+        Back to Dashboard
+      </a>
+    </div>
 
-  <button onclick="save()" class="bg-green-600 text-white px-4 py-2 rounded">Save</button>
+    <script>
+      document.getElementById("btnSave").addEventListener("click", async () => {
+        const id = document.getElementById("id").value.trim();
+        const name = document.getElementById("name").value.trim();
+        if (!id) {
+          alert("ID is required");
+          return;
+        }
 
-  <a href="/admin/index.html" class="block mt-4 text-blue-600 underline">Back</a>
-</div>
+        try {
+          const res = await fetch("/restaurants/" + id, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, name }),
+          });
 
-<script>
-async function save() {
-  const payload = {
-    name: document.getElementById("name").value,
-    hours: document.getElementById("hours").value,
-  };
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            alert("Failed to create: " + (data.error || "Unknown error"));
+            return;
+          }
 
-  const id = document.getElementById("id").value;
-
-  const res = await fetch(`/restaurants/${id}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  if (res.ok) {
-    alert("Restaurant added!");
-    window.location = "/admin/index.html";
-  } else {
-    alert("Error adding restaurant");
-  }
-}
-</script>
-</body>
+          alert("Restaurant created!");
+          window.location.href = "/admin/index.html";
+        } catch (e) {
+          console.error(e);
+          alert("Error creating restaurant");
+        }
+      });
+    </script>
+  </body>
 </html>

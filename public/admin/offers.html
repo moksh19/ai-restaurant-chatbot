@@ -1,121 +1,250 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <title>Edit Offers</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
+  <div class="max-w-4xl mx-auto bg-white shadow mt-8 p-6 rounded">
+    <h1 class="text-2xl font-bold mb-2">Edit Offers</h1>
+    <div id="restaurantName" class="text-gray-600 mb-4"></div>
 
-<div class="max-w-2xl mx-auto bg-white shadow mt-8 p-6 rounded">
-  <h1 class="text-2xl font-bold mb-2">Edit Offers</h1>
-  <div id="restaurantName" class="text-gray-600 mb-4"></div>
-
-  <div id="offersContainer" class="space-y-2 mb-4"></div>
-
-  <button onclick="addOffer()" class="bg-green-600 text-white px-3 py-1 rounded">
-    + Add Offer
-  </button>
-
-  <div class="mt-6 flex gap-3">
-    <button onclick="saveOffers()" class="bg-blue-600 text-white px-4 py-2 rounded">
-      Save Offers
-    </button>
-    <a href="/admin/index.html" class="text-blue-600 underline mt-2">Back to Dashboard</a>
-  </div>
-</div>
-
-<script>
-const url = new URL(window.location.href);
-const id = url.searchParams.get("id");
-
-let restaurant = null;
-
-async function loadRestaurant() {
-  const res = await fetch("/restaurants");
-  const data = await res.json();
-  restaurant = data.find(r => r.id === id);
-
-  if (!restaurant) {
-    alert("Restaurant not found");
-    return;
-  }
-
-  if (!Array.isArray(restaurant.offers)) {
-    restaurant.offers = [];
-  }
-
-  document.getElementById("restaurantName").textContent =
-    restaurant.name + " (ID: " + restaurant.id + ")";
-
-  renderOffers();
-}
-
-function renderOffers() {
-  const container = document.getElementById("offersContainer");
-  container.innerHTML = "";
-
-  restaurant.offers.forEach((offer, index) => {
-    const row = document.createElement("div");
-    row.className = "flex gap-2 items-center";
-
-    row.innerHTML = `
-      <input type="text" value="${offer}" class="border p-2 rounded flex-1 text-sm"
-             data-offer-index="${index}" />
-      <button class="text-red-600 text-xs remove-offer" data-offer-index="${index}">
-        ✕
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">Offers</h2>
+      <button
+        id="btnAdd"
+        class="bg-green-600 text-white px-3 py-1 rounded text-sm"
+      >
+        + Add Offer
       </button>
-    `;
+    </div>
 
-    container.appendChild(row);
-  });
+    <div id="offersContainer" class="space-y-4"></div>
 
-  attachOfferHandlers();
-}
+    <div class="mt-6 flex gap-3">
+      <button
+        id="btnSave"
+        class="bg-blue-600 text-white px-4 py-2 rounded text-sm"
+      >
+        Save Offers
+      </button>
+      <a href="/admin/index.html" class="text-blue-600 underline text-sm">
+        Back to Dashboard
+      </a>
+      <span id="saveStatus" class="text-xs text-gray-600"></span>
+    </div>
+  </div>
 
-function attachOfferHandlers() {
-  document.querySelectorAll('input[data-offer-index]').forEach(input => {
-    input.addEventListener("input", (e) => {
-      const idx = parseInt(e.target.getAttribute("data-offer-index"));
-      restaurant.offers[idx] = e.target.value;
-    });
-  });
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const restaurantId = params.get("id");
 
-  document.querySelectorAll('.remove-offer').forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      const idx = parseInt(e.target.getAttribute("data-offer-index"));
-      restaurant.offers.splice(idx, 1);
+    let restaurant = null;
+
+    async function loadRestaurant() {
+      const res = await fetch("/restaurants");
+      const data = await res.json();
+      restaurant = data.find((r) => r.id === restaurantId);
+
+      if (!restaurant) {
+        alert("Restaurant not found");
+        return;
+      }
+
+      document.getElementById("restaurantName").textContent =
+        (restaurant.name || "Restaurant") + " (ID: " + restaurant.id + ")";
+
+      if (!Array.isArray(restaurant.offers)) {
+        restaurant.offers = [];
+      }
+
+      renderOffers();
+    }
+
+    function renderOffers() {
+      const container = document.getElementById("offersContainer");
+      container.innerHTML = "";
+
+      restaurant.offers.forEach((o, idx) => {
+        const card = document.createElement("div");
+        card.className = "border rounded p-4 bg-gray-50 text-sm";
+        card.innerHTML = `
+          <div class="flex justify-between items-center mb-2">
+            <input
+              type="text"
+              value="${o.title || ""}"
+              placeholder="Offer title"
+              class="border rounded p-2 w-2/3 text-sm"
+              data-index="${idx}"
+              data-field="title"
+            />
+            <button
+              class="text-red-600 text-xs"
+              data-index="${idx}"
+              data-action="remove"
+            >
+              Remove
+            </button>
+          </div>
+          <textarea
+            class="border rounded w-full p-2 mb-2 text-xs"
+            rows="2"
+            placeholder="Details"
+            data-index="${idx}"
+            data-field="details"
+          >${o.details || ""}</textarea>
+
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label class="block text-[11px] text-gray-600 mb-1">Code</label>
+              <input
+                type="text"
+                value="${o.code || ""}"
+                class="border rounded w-full p-1 text-xs"
+                data-index="${idx}"
+                data-field="code"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] text-gray-600 mb-1">Days of Week (0-6 comma sep)</label>
+              <input
+                type="text"
+                value="${(o.daysOfWeek || []).join(",")}"
+                class="border rounded w-full p-1 text-xs"
+                data-index="${idx}"
+                data-field="daysOfWeek"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label class="block text-[11px] text-gray-600 mb-1">Start Date (YYYY-MM-DD)</label>
+              <input
+                type="text"
+                value="${o.startDate || ""}"
+                class="border rounded w-full p-1 text-xs"
+                data-index="${idx}"
+                data-field="startDate"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] text-gray-600 mb-1">End Date (YYYY-MM-DD)</label>
+              <input
+                type="text"
+                value="${o.endDate || ""}"
+                class="border rounded w-full p-1 text-xs"
+                data-index="${idx}"
+                data-field="endDate"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] text-gray-600 mb-1">Start Time (HH:MM)</label>
+              <input
+                type="text"
+                value="${o.startTime || ""}"
+                class="border rounded w-full p-1 text-xs"
+                data-index="${idx}"
+                data-field="startTime"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] text-gray-600 mb-1">End Time (HH:MM)</label>
+              <input
+                type="text"
+                value="${o.endTime || ""}"
+                class="border rounded w-full p-1 text-xs"
+                data-index="${idx}"
+                data-field="endTime"
+              />
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      attachOfferHandlers();
+    }
+
+    function attachOfferHandlers() {
+      // text inputs / textarea
+      document
+        .querySelectorAll("[data-field]")
+        .forEach((el) => {
+          el.addEventListener("input", (e) => {
+            const idx = parseInt(e.target.getAttribute("data-index"), 10);
+            const field = e.target.getAttribute("data-field");
+            if (field === "daysOfWeek") {
+              const raw = e.target.value.trim();
+              restaurant.offers[idx].daysOfWeek = raw
+                ? raw.split(",").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n))
+                : [];
+            } else {
+              restaurant.offers[idx][field] = e.target.value;
+            }
+          });
+        });
+
+      // remove buttons
+      document
+        .querySelectorAll("[data-action='remove']")
+        .forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const idx = parseInt(e.target.getAttribute("data-index"), 10);
+            restaurant.offers.splice(idx, 1);
+            renderOffers();
+          });
+        });
+    }
+
+    document.getElementById("btnAdd").addEventListener("click", () => {
+      if (!Array.isArray(restaurant.offers)) {
+        restaurant.offers = [];
+      }
+      restaurant.offers.push({
+        title: "",
+        details: "",
+        code: "",
+        startDate: null,
+        endDate: null,
+        startTime: null,
+        endTime: null,
+        daysOfWeek: [],
+      });
       renderOffers();
     });
-  });
-}
 
-function addOffer() {
-  restaurant.offers.push("");
-  renderOffers();
-}
+    document.getElementById("btnSave").addEventListener("click", async () => {
+      const saveStatus = document.getElementById("saveStatus");
+      saveStatus.textContent = "Saving...";
 
-async function saveOffers() {
-  const cleaned = restaurant.offers.map(o => o.trim()).filter(o => o.length > 0);
+      try {
+        const res = await fetch("/restaurants/" + restaurantId, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            offers: restaurant.offers,
+            replaceOffers: true,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          saveStatus.textContent =
+            "Save failed: " + (data.error || "Unknown error");
+        } else {
+          saveStatus.textContent = "Saved.";
+        }
+      } catch (e) {
+        console.error(e);
+        saveStatus.textContent = "Error saving offers.";
+      }
+    });
 
-  const payload = {
-    offers: cleaned
-  };
-
-  const res = await fetch(`/restaurants/${restaurant.id}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  if (res.ok) {
-    alert("Offers saved!");
-  } else {
-    alert("Error saving offers");
-  }
-}
-
-loadRestaurant();
-</script>
+    loadRestaurant();
+  </script>
 </body>
 </html>
