@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Edit Basic Info</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+  <div class="max-w-4xl mx-auto bg-white shadow mt-8 p-6 rounded">
+    <h1 class="text-2xl font-bold mb-2">Edit Basic Info</h1>
+    <div id="restaurantId" class="text-sm text-gray-500 mb-4"></div>
+
+    <!-- IMPORT METADATA FROM WEBSITE -->
+    <div class="mb-6 border rounded p-4 bg-slate-50">
+      <h2 class="font-semibold mb-2">Import From Website</h2>
+      <p class="text-sm text-gray-600 mb-2">
+        Paste the restaurant’s main website or online menu.  
+        We’ll try to pull name, address, hours, ordering links, etc.
+      </p>
+      <div class="flex gap-2 mb-2">
+        <input
+          id="importUrl"
+          type="text"
+          class="border rounded p-2 flex-1 text-sm"
+          placeholder="https://example.com"
+        />
+        <button
+          id="btnImportUrl"
+          class="bg-indigo-600 text-white px-3 py-2 rounded text-sm"
+        >
+          Import Metadata
+        </button>
+      </div>
+      <div id="importStatus" class="text-xs text-gray-500"></div>
+    </div>
+
+    <!-- BASIC FIELDS -->
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Name</label>
+        <input
+          id="name"
+          type="text"
+          class="border rounded w-full p-2 text-sm"
+          placeholder="Pizza & Pints"
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Address</label>
+        <textarea
+          id="address"
+          class="border rounded w-full p-2 text-sm"
+          rows="2"
+          placeholder="Street, City, State ZIP"
+        ></textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Phone</label>
+          <input
+            id="phone"
+            type="text"
+            class="border rounded w-full p-2 text-sm"
+            placeholder="(555) 123-4567"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Email</label>
+          <input
+            id="email"
+            type="email"
+            class="border rounded w-full p-2 text-sm"
+            placeholder="info@example.com"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Google Maps URL</label>
+        <input
+          id="googleMapsUrl"
+          type="text"
+          class="border rounded w-full p-2 text-sm"
+          placeholder="https://maps.google.com/..."
+        />
+      </div>
+
+      <!-- ORDERING LINKS -->
+      <div>
+        <label class="block text-sm font-medium mb-1">
+          Ordering Links
+          <span class="text-xs text-gray-500">(one per line: Label | URL)</span>
+        </label>
+        <textarea
+          id="orderingLinks"
+          class="border rounded w-full p-2 text-sm"
+          rows="3"
+          placeholder="DoorDash | https://doordash.com/...\nUberEats | https://ubereats.com/..."
+        ></textarea>
+      </div>
+
+      <!-- HOURS -->
+      <div>
+        <label class="block text-sm font-medium mb-1">Hours</label>
+        <p class="text-xs text-gray-500 mb-2">
+          Use whatever format you like (e.g. <code>11:00–22:00</code> or
+          <code>CLOSED</code>).
+        </p>
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <div class="flex items-center gap-2">
+            <span class="w-10">Mon</span>
+            <input id="hours-mon" class="flex-1 border rounded p-1" />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-10">Tue</span>
+            <input id="hours-tue" class="flex-1 border rounded p-1" />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-10">Wed</span>
+            <input id="hours-wed" class="flex-1 border rounded p-1" />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-10">Thu</span>
+            <input id="hours-thu" class="flex-1 border rounded p-1" />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-10">Fri</span>
+            <input id="hours-fri" class="flex-1 border rounded p-1" />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-10">Sat</span>
+            <input id="hours-sat" class="flex-1 border rounded p-1" />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-10">Sun</span>
+            <input id="hours-sun" class="flex-1 border rounded p-1" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6 flex gap-3">
+      <button
+        id="btnSave"
+        class="bg-blue-600 text-white px-4 py-2 rounded text-sm"
+      >
+        Save Basic Info
+      </button>
+      <a href="/admin/index.html" class="text-blue-600 underline text-sm">
+        Back to Dashboard
+      </a>
+      <div id="saveStatus" class="text-xs text-gray-500 mt-2"></div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+
+    if (!id) {
+      document.body.innerHTML =
+        '<div class="max-w-xl mx-auto mt-10 text-red-600 font-semibold">Missing ?id= in URL</div>';
+    }
+
+    document.getElementById("restaurantId").textContent = "ID: " + id;
+
+    function linksToTextarea(links) {
+      if (!Array.isArray(links)) return "";
+      return links
+        .map((l) => {
+          if (!l) return "";
+          const label = l.label || "";
+          const url = l.url || "";
+          return label + " | " + url;
+        })
+        .filter(Boolean)
+        .join("\\n");
+    }
+
+    function textareaToLinks(str) {
+      const lines = (str || "").split(/\\r?\\n/);
+      const out = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const [labelPart, urlPart] = trimmed.split("|");
+        const label = (labelPart || "").trim();
+        const url = (urlPart || "").trim();
+        if (!url) continue;
+        out.push({ label: label || url, url });
+      }
+      return out;
+    }
+
+    function hoursToInputs(hours) {
+      const map = hours || {};
+      const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+      for (const d of days) {
+        const el = document.getElementById("hours-" + d);
+        if (el) el.value = map[d] || "";
+      }
+    }
+
+    function inputsToHours() {
+      const out = {};
+      const days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+      for (const d of days) {
+        const el = document.getElementById("hours-" + d);
+        out[d] = el ? el.value.trim() || null : null;
+      }
+      return out;
+    }
+
+    async function loadRestaurant() {
+      try {
+        const res = await fetch("/restaurants");
+        const all = await res.json();
+        const restaurant = all.find((r) => r.id === id);
+        if (!restaurant) {
+          document.getElementById("saveStatus").textContent =
+            "Restaurant not found.";
+          return;
+        }
+
+        document.getElementById("name").value = restaurant.name || "";
+        document.getElementById("address").value = restaurant.address || "";
+        document.getElementById("phone").value = restaurant.phone || "";
+        document.getElementById("email").value = restaurant.email || "";
+        document.getElementById("googleMapsUrl").value =
+          restaurant.googleMapsUrl || "";
+        document.getElementById("orderingLinks").value = linksToTextarea(
+          restaurant.orderingLinks
+        );
+        hoursToInputs(restaurant.hours);
+      } catch (err) {
+        console.error("loadRestaurant failed:", err);
+        document.getElementById("saveStatus").textContent =
+          "Error loading restaurant.";
+      }
+    }
+
+    async function saveBasic() {
+      try {
+        document.getElementById("saveStatus").textContent = "Saving...";
+
+        const payload = {
+          name: document.getElementById("name").value.trim() || null,
+          address: document.getElementById("address").value.trim() || null,
+          phone: document.getElementById("phone").value.trim() || null,
+          email: document.getElementById("email").value.trim() || null,
+          googleMapsUrl:
+            document.getElementById("googleMapsUrl").value.trim() || null,
+          orderingLinks: textareaToLinks(
+            document.getElementById("orderingLinks").value
+          ),
+          hours: inputsToHours(),
+        };
+
+        const res = await fetch("/restaurants/" + id, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) throw new Error("Save failed");
+
+        document.getElementById("saveStatus").textContent =
+          "Saved successfully.";
+      } catch (err) {
+        console.error("saveBasic failed:", err);
+        document.getElementById("saveStatus").textContent =
+          "Error saving basic info.";
+      }
+    }
+
+    async function importMetadata() {
+      const urlInput = document.getElementById("importUrl").value.trim();
+      const statusEl = document.getElementById("importStatus");
+      if (!urlInput) {
+        alert("Enter a website URL first");
+        return;
+      }
+
+      try {
+        statusEl.textContent = "Importing from website...";
+        const res = await fetch("/import-metadata-from-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restaurantId: id, url: urlInput }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.metadata) {
+          throw new Error(data.error || "Import failed");
+        }
+
+        const meta = data.metadata;
+
+        if (meta.name) document.getElementById("name").value = meta.name;
+        if (meta.address)
+          document.getElementById("address").value = meta.address;
+        if (meta.phone) document.getElementById("phone").value = meta.phone;
+        if (meta.email) document.getElementById("email").value = meta.email;
+        if (meta.googleMapsUrl)
+          document.getElementById("googleMapsUrl").value = meta.googleMapsUrl;
+        if (meta.orderingLinks) {
+          document.getElementById("orderingLinks").value = linksToTextarea(
+            meta.orderingLinks
+          );
+        }
+        if (meta.hours) {
+          hoursToInputs(meta.hours);
+        }
+
+        statusEl.textContent = "Imported metadata. Review and click Save.";
+      } catch (err) {
+        console.error("importMetadata failed:", err);
+        statusEl.textContent = "Error importing metadata.";
+      }
+    }
+
+    document
+      .getElementById("btnSave")
+      .addEventListener("click", (e) => {
+        e.preventDefault();
+        saveBasic();
+      });
+
+    document
+      .getElementById("btnImportUrl")
+      .addEventListener("click", (e) => {
+        e.preventDefault();
+        importMetadata();
+      });
+
+    loadRestaurant();
+  </script>
+</body>
+</html>
