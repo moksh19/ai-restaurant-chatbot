@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Import Offers From Instagram</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div class="max-w-3xl mx-auto bg-white shadow mt-8 p-6 rounded">
+      <h1 class="text-2xl font-bold mb-2">Import Offers From Instagram</h1>
+      <div id="restaurantInfo" class="text-sm text-gray-600 mb-4">
+        Loading restaurant...
+      </div>
+
+      <div class="mb-4 border rounded p-4 bg-slate-50">
+        <h2 class="font-semibold mb-2">Instagram Source</h2>
+        <p class="text-xs text-gray-600 mb-2">
+          You can either paste an Instagram post / reel / profile URL, or raw
+          caption text. If both are provided, caption text is used first.
+        </p>
+
+        <label class="block text-sm font-medium mb-1">Instagram URL</label>
+        <input
+          id="instaUrl"
+          type="text"
+          class="border rounded w-full p-2 text-sm mb-3"
+          placeholder="https://www.instagram.com/p/..."
+        />
+
+        <label class="block text-sm font-medium mb-1">
+          Or Paste Instagram Caption / Text
+        </label>
+        <textarea
+          id="instaText"
+          rows="4"
+          class="border rounded w-full p-2 text-sm"
+          placeholder="Example: $2 OFF any large pizza this weekend, use code WEEKEND2. Valid Fri–Sun only..."
+        ></textarea>
+
+        <div class="mt-3 flex items-center gap-3">
+          <button
+            id="btnImport"
+            class="bg-pink-600 text-white px-4 py-2 rounded text-sm"
+          >
+            Import Offers
+          </button>
+          <span id="importStatus" class="text-xs text-gray-600"></span>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <h2 class="font-semibold mb-2">Imported Offers Preview</h2>
+        <p class="text-xs text-gray-500 mb-2">
+          Review these before saving. You can adjust dates and details later on
+          the <strong>Edit Offers</strong> page.
+        </p>
+        <pre
+          id="offersPreview"
+          class="border rounded bg-slate-50 p-3 text-xs overflow-x-auto min-h-[80px]"
+        ></pre>
+      </div>
+
+      <div class="mb-4 flex items-center gap-2">
+        <input
+          id="replaceOffers"
+          type="checkbox"
+          class="h-4 w-4"
+        />
+        <label for="replaceOffers" class="text-sm">
+          Replace existing offers instead of appending
+        </label>
+      </div>
+
+      <div class="flex gap-3 items-center">
+        <button
+          id="btnSave"
+          class="bg-emerald-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
+          disabled
+        >
+          Save Offers to Restaurant
+        </button>
+        <a href="/admin/index.html" class="text-blue-600 underline text-sm">
+          Back to Dashboard
+        </a>
+        <span id="saveStatus" class="text-xs text-gray-600"></span>
+      </div>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const restaurantId = params.get("id");
+
+      const infoEl = document.getElementById("restaurantInfo");
+      const importStatusEl = document.getElementById("importStatus");
+      const previewEl = document.getElementById("offersPreview");
+      const saveBtn = document.getElementById("btnSave");
+      const saveStatusEl = document.getElementById("saveStatus");
+
+      let importedOffers = [];
+
+      if (!restaurantId) {
+        document.body.innerHTML =
+          '<div class="max-w-xl mx-auto mt-10 text-red-600 font-semibold">Missing ?id= in URL.</div>';
+      } else {
+        infoEl.textContent = "Restaurant ID: " + restaurantId;
+        loadRestaurantName();
+      }
+
+      async function loadRestaurantName() {
+        try {
+          const res = await fetch("/restaurants");
+          if (!res.ok) return;
+
+          const all = await res.json();
+          const r = all.find((x) => x.id === restaurantId);
+          if (r) {
+            infoEl.textContent =
+              (r.name || "Restaurant") + " (ID: " + restaurantId + ")";
+          }
+        } catch (e) {
+          console.warn("Could not load restaurant name", e);
+        }
+      }
+
+      async function importFromInstagram() {
+        const url = document.getElementById("instaUrl").value.trim();
+        const text = document.getElementById("instaText").value.trim();
+
+        if (!url && !text) {
+          alert("Please provide an Instagram URL or caption text.");
+          return;
+        }
+
+        importStatusEl.textContent = "Importing offers from Instagram...";
+        previewEl.textContent = "";
+        saveBtn.disabled = true;
+        saveStatusEl.textContent = "";
+        importedOffers = [];
+
+        try {
+          const res = await fetch("/import-offers-from-instagram", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ restaurantId, url, text }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Import failed");
+          }
+
+          if (!Array.isArray(data.offers) || data.offers.length === 0) {
+            importStatusEl.textContent =
+              "No offers detected. Check the content and try again.";
+            previewEl.textContent = "";
+            return;
+          }
+
+          importedOffers = data.offers;
+          importStatusEl.textContent =
+            "Imported " + importedOffers.length + " offer(s). Review below.";
+          previewEl.textContent = JSON.stringify(
+            importedOffers,
+            null,
+            2
+          );
+          saveBtn.disabled = false;
+        } catch (err) {
+          console.error("Instagram import error:", err);
+          importStatusEl.textContent = "Error importing offers.";
+          previewEl.textContent = "";
+          saveBtn.disabled = true;
+        }
+      }
+
+      async function saveOffers() {
+        if (!importedOffers || importedOffers.length === 0) {
+          alert("No imported offers to save.");
+          return;
+        }
+
+        const replace = document.getElementById("replaceOffers").checked;
+
+        saveStatusEl.textContent = "Saving offers...";
+        saveBtn.disabled = true;
+
+        try {
+          const res = await fetch("/restaurants/" + restaurantId, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              offers: importedOffers,
+              replaceOffers: replace,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Save failed");
+          }
+
+          saveStatusEl.textContent = replace
+            ? "Saved. Existing offers were replaced."
+            : "Saved. Imported offers were appended to existing ones.";
+
+          // keep button enabled if they want to tweak again
+          saveBtn.disabled = false;
+        } catch (err) {
+          console.error("Save offers error:", err);
+          saveStatusEl.textContent = "Error saving offers.";
+          saveBtn.disabled = false;
+        }
+      }
+
+      document
+        .getElementById("btnImport")
+        .addEventListener("click", (e) => {
+          e.preventDefault();
+          importFromInstagram();
+        });
+
+      saveBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        saveOffers();
+      });
+    </script>
+  </body>
+</html>
