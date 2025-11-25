@@ -5,76 +5,16 @@
       {
         "category": "Build Your Own Pizza",
         "items": [
-          {
-            "name": "2-Topping Pizza",
-            "price": "$13.95",
-            "notes": ""
-          },
-          {
-            "name": "4-Topping Pizza",
-            "price": "$15.95",
-            "notes": ""
-          },
-          {
-            "name": "7-Topping Pizza",
-            "price": "$17.95",
-            "notes": ""
-          }
+          { "name": "2-Topping Pizza", "price": "$13.95", "notes": "" },
+          { "name": "4-Topping Pizza", "price": "$15.95", "notes": "" },
+          { "name": "7-Topping Pizza", "price": "$17.95", "notes": "" }
         ]
       },
       {
         "category": "Signature Pizzas",
         "items": [
-          {
-            "name": "Veggie Lovers",
-            "price": "$14.95",
-            "notes": "Marinara, Shredded Mozzarella, Bellpepper, Olives, Mushroom, Onion"
-          },
-          {
-            "name": "Four Cheese",
-            "price": "$14.95",
-            "notes": "Parmesan, Shredded Mozzarella, Ricotta, Cheddar"
-          },
-          {
-            "name": "Pepperoni",
-            "price": "$12.95",
-            "notes": "Marinara, mozzarella, Pepperoni"
-          },
-          {
-            "name": "Meat Lovers",
-            "price": "$14.95",
-            "notes": "Marinara, Shredded Mozzarella, Pepperoni, sausage"
-          },
-          {
-            "name": "Cheese Pizza",
-            "price": "$12.95",
-            "notes": "Mozzarella Cheese, Marinara"
-          },
-          {
-            "name": "Margherita",
-            "price": "$13.95",
-            "notes": "Mozzarella, Tomato, Marinara, Basil"
-          },
-          {
-            "name": "BBQ Chicken",
-            "price": "$14.95",
-            "notes": "BBQ Sauce, Mozzarella, Chicken, Bacon, BBQ and Ranch Drizzle"
-          },
-          {
-            "name": "Buffalo Chicken",
-            "price": "$14.95",
-            "notes": "Buffalo Sauce, Mozzarella, Buffalo chicken, caramelized onions, cheddar cheese, buffalo & ranch drizzle"
-          },
-          {
-            "name": "Supreme",
-            "price": "$15.95",
-            "notes": "Marinara, Mozzarella, pepperoni, sausage, onions, green peppers, black olives"
-          },
-          {
-            "name": "Hawaiian hurricane",
-            "price": "$14.95",
-            "notes": "marinara, mozzarella, ham, bacon, pineapple"
-          }
+          { "name": "Veggie Lovers", "price": "$14.95", "notes": "..." }
+          // etc...
         ]
       }
     ]

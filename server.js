@@ -30,7 +30,6 @@ app.use("/admin", express.static(path.join(__dirname, "public/admin")));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-
 // =========================================================
 // RESTAURANT STORAGE (OBJECT-BASED, SAFE VERSION)
 // =========================================================
@@ -42,10 +41,12 @@ async function loadRestaurants() {
     const data = await fs.readFile(restaurantsFile, "utf8");
     const parsed = JSON.parse(data);
 
+    // Already an object: good
     if (!Array.isArray(parsed) && typeof parsed === "object") {
       return parsed;
     }
 
+    // If it's an array, convert to object keyed by id
     if (Array.isArray(parsed)) {
       const obj = {};
       for (const r of parsed) {
@@ -71,7 +72,6 @@ async function saveRestaurants(data) {
 
 let restaurants = {};
 
-
 // =========================================================
 // CLOUDINARY + MULTER (IMAGE UPLOAD)
 // =========================================================
@@ -83,7 +83,6 @@ cloudinary.config({
 });
 
 const upload = multer({ storage: multer.memoryStorage() });
-
 
 app.post("/upload-image", upload.single("image"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -102,7 +101,6 @@ app.post("/upload-image", upload.single("image"), (req, res) => {
   stream.end(req.file.buffer);
 });
 
-
 // =========================================================
 // IMPORT FROM URL — PREVIEW ONLY
 // =========================================================
@@ -111,8 +109,11 @@ app.post("/import-from-url", async (req, res) => {
   try {
     const { restaurantId, url } = req.body;
 
-    if (!restaurantId || !url)
-      return res.status(400).json({ error: "restaurantId and url are required" });
+    if (!restaurantId || !url) {
+      return res
+        .status(400)
+        .json({ error: "restaurantId and url are required" });
+    }
 
     const response = await fetch(url);
     const html = await response.text();
@@ -120,13 +121,17 @@ app.post("/import-from-url", async (req, res) => {
     const dom = new JSDOM(html);
     const text = dom.window.document.body.textContent || "";
 
+    if (!text.trim()) {
+      return res.status(500).json({ error: "No readable text found" });
+    }
+
     const ai = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
           content: `
-Extract restaurant menu from text. Return ONLY JSON:
+Extract a restaurant menu from this text and return ONLY valid JSON:
 
 [
   {
@@ -139,9 +144,9 @@ Extract restaurant menu from text. Return ONLY JSON:
 
 Text:
 ${text}
-`
-        }
-      ]
+`,
+        },
+      ],
     });
 
     const raw = ai.choices[0].message.content.trim();
@@ -149,13 +154,12 @@ ${text}
 
     const menuJson = JSON.parse(cleaned);
 
-    res.json({ menu: menuJson });
+    res.json({ menu: menuJson }); // preview-only
   } catch (err) {
     console.error("URL import error:", err);
     res.status(500).json({ error: "Failed to import menu from URL" });
   }
 });
-
 
 // =========================================================
 // IMPORT FROM IMAGE — PREVIEW ONLY
@@ -164,8 +168,12 @@ ${text}
 app.post("/import-from-image", upload.single("image"), async (req, res) => {
   try {
     const { restaurantId } = req.body;
-    if (!restaurantId) return res.status(400).json({ error: "restaurantId required" });
-    if (!req.file) return res.status(400).json({ error: "image required" });
+    if (!restaurantId) {
+      return res.status(400).json({ error: "restaurantId required" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: "image required" });
+    }
 
     const base64 = req.file.buffer.toString("base64");
     const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
@@ -179,25 +187,25 @@ app.post("/import-from-image", upload.single("image"), async (req, res) => {
             {
               type: "text",
               text: `
-Extract restaurant menu from image. Return ONLY JSON:
+Extract a restaurant menu from this image and return ONLY valid JSON:
 
 [
   {
-    "category": "Category",
+    "category": "Category Name",
     "items": [
-      { "name": "Item", "price": "$0.00", "notes": "" }
+      { "name": "Item Name", "price": "$0.00", "notes": "" }
     ]
   }
 ]
-`
+`,
             },
             {
               type: "image_url",
-              image_url: { url: dataUrl }
-            }
-          ]
-        }
-      ]
+              image_url: { url: dataUrl },
+            },
+          ],
+        },
+      ],
     });
 
     const raw = completion.choices[0].message.content.trim();
@@ -205,36 +213,38 @@ Extract restaurant menu from image. Return ONLY JSON:
 
     const menuJson = JSON.parse(cleaned);
 
-    res.json({ menu: menuJson });
-
+    res.json({ menu: menuJson }); // preview-only
   } catch (err) {
     console.error("Image import error:", err);
     res.status(500).json({ error: "Failed to import menu from image" });
   }
 });
 
-
 // =========================================================
-// MERGE LOGIC — SUPER IMPORTANT
+// MERGE LOGIC — FOR MENUS
 // =========================================================
 
 function mergeMenus(oldMenu, newMenu) {
-  const merged = oldMenu.map(c => ({
+  const merged = oldMenu.map((c) => ({
     ...c,
-    items: [...(c.items || [])]
+    items: [...(c.items || [])],
   }));
 
   for (const newCat of newMenu) {
     const existingCat = merged.find(
-      c => c.category?.toLowerCase() === newCat.category?.toLowerCase()
+      (c) =>
+        c.category?.toLowerCase() === newCat.category?.toLowerCase()
     );
 
     if (!existingCat) {
-      merged.push({ category: newCat.category, items: newCat.items || [] });
+      merged.push({
+        category: newCat.category,
+        items: newCat.items || [],
+      });
     } else {
       for (const newItem of newCat.items || []) {
         const existingItem = existingCat.items.find(
-          i => i.name?.toLowerCase() === newItem.name?.toLowerCase()
+          (i) => i.name?.toLowerCase() === newItem.name?.toLowerCase()
         );
 
         if (!existingItem) {
@@ -251,10 +261,14 @@ function mergeMenus(oldMenu, newMenu) {
   return merged;
 }
 
+// =========================================================
+// RESTAURANTS ROUTES
+// =========================================================
 
-// =========================================================
-// SAFE RESTAURANT UPDATE W/ MERGING
-// =========================================================
+// ✅ This is the one the dashboard calls
+app.get("/restaurants", (req, res) => {
+  res.json(Object.values(restaurants));
+});
 
 app.post("/restaurants/:id", async (req, res) => {
   const id = req.params.id;
@@ -263,16 +277,15 @@ app.post("/restaurants/:id", async (req, res) => {
   const existing = restaurants[id] || { id, menu: [], offers: [], faq: [] };
 
   let finalMenu = existing.menu;
-
   if (Array.isArray(data.menu)) {
-    finalMenu = mergeMenus(existing.menu, data.menu); // 🔥 merge instead of replace
+    finalMenu = mergeMenus(existing.menu, data.menu);
   }
 
   const updated = {
     ...existing,
     ...data,
     id,
-    menu: finalMenu
+    menu: finalMenu,
   };
 
   restaurants[id] = updated;
@@ -281,9 +294,8 @@ app.post("/restaurants/:id", async (req, res) => {
   res.json(updated);
 });
 
-
 // =========================================================
-// CHATBOT
+ // CHATBOT
 // =========================================================
 
 app.post("/chat", async (req, res) => {
@@ -291,7 +303,9 @@ app.post("/chat", async (req, res) => {
     const { restaurantId, message, history } = req.body;
 
     const restaurant = restaurants[restaurantId];
-    if (!restaurant) return res.status(404).json({ error: "Restaurant not found" });
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
 
     const context = JSON.stringify(restaurant, null, 2);
 
@@ -300,11 +314,11 @@ app.post("/chat", async (req, res) => {
       messages: [
         {
           role: "system",
-          content: `You are a helpful restaurant AI. Use ONLY this data:\n${context}`
+          content: `You are a helpful restaurant AI. Use ONLY this data:\n${context}`,
         },
         ...(history || []),
-        { role: "user", content: message }
-      ]
+        { role: "user", content: message },
+      ],
     });
 
     res.json({ reply: completion.choices[0].message.content });
@@ -314,14 +328,15 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-
 // =========================================================
 // START SERVER
 // =========================================================
 
 async function start() {
   restaurants = await loadRestaurants();
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 }
 
 start();
