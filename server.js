@@ -18,39 +18,37 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ------------------------------------
-// Middleware
-// ------------------------------------
+// ---------------------- Middleware ----------------------
 app.use(cors());
 app.use(express.json());
 
-// Static
+// Static files
 app.use(express.static(path.join(__dirname, "public")));
-app.use("/admin", express.static(path.join(__dirname, "public/admin")));
+app.use("/admin", express.static(path.join(__dirname, "public", "admin")));
 
-app.get("/landing.html", (req, res) => {
+// Landing page at root
+app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "landing.html"));
 });
 
-// Redirect root to admin dashboard
-app.get("/", (req, res) => {
+// Optional direct landing URL
+app.get("/landing.html", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "landing.html"));
 });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// =========================================================
-// RESTAURANT STORAGE (OBJECT-BASED, SAFE VERSION)
-// =========================================================
-
+// ---------------------- Restaurants store ----------------------
 const restaurantsFile = path.join(__dirname, "restaurants.json");
+let restaurants = {};
 
+// Load restaurants from JSON (supports old array format)
 async function loadRestaurants() {
   try {
     const data = await fs.readFile(restaurantsFile, "utf8");
     const parsed = JSON.parse(data);
 
-    // Already an object: good
+    // If already object {id: restaurant}
     if (!Array.isArray(parsed) && typeof parsed === "object") {
       return parsed;
     }
@@ -79,12 +77,23 @@ async function saveRestaurants(data) {
   }
 }
 
-let restaurants = {};
+// ---------------------- Backup endpoint ----------------------
+app.get("/admin/backup", (req, res) => {
+  try {
+    const backupJson = JSON.stringify(restaurants, null, 2);
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=restaurants-backup.json"
+    );
+    res.send(backupJson);
+  } catch (err) {
+    console.error("Backup error:", err);
+    res.status(500).send("Error generating backup");
+  }
+});
 
-// =========================================================
-// CLOUDINARY + MULTER (IMAGE UPLOAD)
-// =========================================================
-
+// ---------------------- Cloudinary + Multer (image upload) ----------------------
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.CLOUD_KEY,
@@ -110,18 +119,12 @@ app.post("/upload-image", upload.single("image"), (req, res) => {
   stream.end(req.file.buffer);
 });
 
-// =========================================================
-// IMPORT FROM URL — PREVIEW ONLY
-// =========================================================
-
+// ---------------------- IMPORT MENU FROM URL ----------------------
 app.post("/import-from-url", async (req, res) => {
   try {
     const { restaurantId, url } = req.body;
-
     if (!restaurantId || !url) {
-      return res
-        .status(400)
-        .json({ error: "restaurantId and url are required" });
+      return res.status(400).json({ error: "restaurantId and url are required" });
     }
 
     const response = await fetch(url);
@@ -159,21 +162,17 @@ ${text}
     });
 
     const raw = ai.choices[0].message.content.trim();
-    const cleaned = raw.replace(/^```json/i, "").replace(/```$/, "").trim();
-
+    const cleaned = raw.replace(/^```json/i, "").replace(/```$/i, "").trim();
     const menuJson = JSON.parse(cleaned);
 
-    res.json({ menu: menuJson }); // preview-only
+    res.json({ menu: menuJson }); // preview only
   } catch (err) {
     console.error("URL import error:", err);
     res.status(500).json({ error: "Failed to import menu from URL" });
   }
 });
 
-// =========================================================
-// IMPORT FROM IMAGE — PREVIEW ONLY
-// =========================================================
-
+// ---------------------- IMPORT MENU FROM IMAGE ----------------------
 app.post("/import-from-image", upload.single("image"), async (req, res) => {
   try {
     const { restaurantId } = req.body;
@@ -218,22 +217,17 @@ Extract a restaurant menu from this image and return ONLY valid JSON:
     });
 
     const raw = completion.choices[0].message.content.trim();
-    const cleaned = raw.replace(/^```json/i, "").replace(/```$/, "").trim();
-
+    const cleaned = raw.replace(/^```json/i, "").replace(/```$/i, "").trim();
     const menuJson = JSON.parse(cleaned);
 
-    res.json({ menu: menuJson }); // preview-only
+    res.json({ menu: menuJson }); // preview only
   } catch (err) {
     console.error("Image import error:", err);
     res.status(500).json({ error: "Failed to import menu from image" });
   }
 });
 
-
-// =========================================================
-// IMPORT OFFERS FROM WEBSITE URL — PREVIEW ONLY
-// =========================================================
-
+// ---------------------- IMPORT OFFERS FROM URL (2B) ----------------------
 app.post("/import-offers-from-url", async (req, res) => {
   try {
     const { restaurantId, url } = req.body;
@@ -242,7 +236,6 @@ app.post("/import-offers-from-url", async (req, res) => {
       return res.status(400).json({ error: "restaurantId and url required" });
     }
 
-    // Fetch HTML from the website
     const response = await fetch(url);
     const html = await response.text();
 
@@ -273,14 +266,13 @@ Return STRICT JSON like this:
 If dates or times are not clearly specified, set them to null.
 HTML:
 ${html}
-`
-        }
-      ]
+`,
+        },
+      ],
     });
 
     let raw = completion.choices[0].message.content.trim();
     raw = raw.replace(/^```json/i, "").replace(/```$/i, "").trim();
-
     const offers = JSON.parse(raw);
 
     return res.json({ offers });
@@ -290,10 +282,7 @@ ${html}
   }
 });
 
-// =========================================================
-// MERGE LOGIC — FOR MENUS
-// =========================================================
-
+// ---------------------- Menu merge helper ----------------------
 function mergeMenus(oldMenu, newMenu) {
   const merged = oldMenu.map((c) => ({
     ...c,
@@ -331,28 +320,44 @@ function mergeMenus(oldMenu, newMenu) {
   return merged;
 }
 
-// =========================================================
-// RESTAURANTS ROUTES
-// =========================================================
+// ---------------------- Offers active logic (for chat) ----------------------
+function offerIsActive(offer, now = new Date()) {
+  const today = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  const dayOfWeek = now.getDay(); // 0=Sun..6=Sat
 
-// used by dashboard
+  if (offer.startDate && today < offer.startDate) return false;
+  if (offer.endDate && today > offer.endDate) return false;
+
+  if (Array.isArray(offer.daysOfWeek) && offer.daysOfWeek.length > 0) {
+    if (!offer.daysOfWeek.includes(dayOfWeek)) return false;
+  }
+
+  if (offer.startTime || offer.endTime) {
+    const [sh, sm] = (offer.startTime || "00:00").split(":").map(Number);
+    const [eh, em] = (offer.endTime || "23:59").split(":").map(Number);
+
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const startMinutes = sh * 60 + sm;
+    const endMinutes = eh * 60 + em;
+
+    if (nowMinutes < startMinutes || nowMinutes > endMinutes) return false;
+  }
+
+  return true;
+}
+
+function getActiveOffers(restaurant, now = new Date()) {
+  if (!restaurant.offers || !Array.isArray(restaurant.offers)) return [];
+  return restaurant.offers.filter((o) => offerIsActive(o, now));
+}
+
+// ---------------------- RESTAURANTS ROUTES ----------------------
 app.get("/restaurants", (req, res) => {
-  res.json(Object.values(restaurants));
-});
-
-// Download full backup of all restaurants
-app.get("/admin/backup", (req, res) => {
   try {
-    const backupJson = JSON.stringify(restaurants, null, 2);
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=restaurants-backup.json"
-    );
-    res.send(backupJson);
+    res.json(Object.values(restaurants));
   } catch (err) {
-    console.error("Backup error:", err);
-    res.status(500).send("Error generating backup");
+    console.error("GET /restaurants error:", err);
+    res.status(500).json({ error: "Failed to load restaurants" });
   }
 });
 
@@ -366,22 +371,18 @@ app.post("/restaurants/:id", async (req, res) => {
   let finalMenu = existing.menu;
   if (Array.isArray(data.menu)) {
     if (data.replace) {
-      // FULL REPLACE of menu
       finalMenu = data.menu;
     } else {
-      // MERGE menu
-      finalMenu = mergeMenus(existing.menu, data.menu);
+      finalMenu = mergeMenus(existing.menu || [], data.menu);
     }
   }
 
-  // Handle offers (for 2B)
+  // Handle offers
   let finalOffers = existing.offers || [];
   if (Array.isArray(data.offers)) {
     if (data.replaceOffers) {
-      // FULL REPLACE of offers
       finalOffers = data.offers;
     } else {
-      // APPEND to existing offers
       finalOffers = [...(existing.offers || []), ...data.offers];
     }
   }
@@ -394,7 +395,6 @@ app.post("/restaurants/:id", async (req, res) => {
     offers: finalOffers,
   };
 
-  // Don't accidentally store control flags
   delete updated.replace;
   delete updated.replaceOffers;
 
@@ -404,11 +404,7 @@ app.post("/restaurants/:id", async (req, res) => {
   res.json(updated);
 });
 
-
-// =========================================================
-// CHATBOT
-// =========================================================
-
+// ---------------------- Chatbot ----------------------
 app.post("/chat", async (req, res) => {
   try {
     const { restaurantId, message, history } = req.body;
@@ -418,14 +414,30 @@ app.post("/chat", async (req, res) => {
       return res.status(404).json({ error: "Restaurant not found" });
     }
 
-    const context = JSON.stringify(restaurant, null, 2);
+    const activeOffers = getActiveOffers(restaurant);
+    const context = JSON.stringify(
+      {
+        ...restaurant,
+        activeOffers,
+      },
+      null,
+      2
+    );
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `You are a helpful restaurant AI. Use ONLY this data:\n${context}`,
+          content: `
+You are a helpful AI assistant for a restaurant.
+Use ONLY this JSON data to answer questions:
+
+${context}
+
+If user asks about deals/promos, ONLY mention items from "activeOffers".
+If activeOffers is empty, say there are no current promotions.
+`,
         },
         ...(history || []),
         { role: "user", content: message },
@@ -439,10 +451,7 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// =========================================================
-// START SERVER
-// =========================================================
-
+// ---------------------- Start server ----------------------
 async function start() {
   restaurants = await loadRestaurants();
   app.listen(PORT, () => {
