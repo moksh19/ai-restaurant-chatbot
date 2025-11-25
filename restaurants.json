@@ -14,7 +14,7 @@
         "category": "Signature Pizzas",
         "items": [
           { "name": "Veggie Lovers", "price": "$14.95", "notes": "..." }
-          // etc...
+          
         ]
       }
     ]
