@@ -62,13 +62,8 @@ async function loadRestaurants() {
       const card = document.createElement("div");
       card.className = "border rounded p-4 bg-gray-50";
 
-      // Snippet for embedding widget on their site.
-      // IMPORTANT: escape </script> as <\/script> so it doesn’t break this script block.
-      const snippet = `<script
-  src="${origin}/widget.js"
-  data-restaurant-id="${id}"
-  data-backend-url="${origin}"
-></script>`;
+      // embed snippet
+      const snippet = `<script src="${origin}/widget.js" data-restaurant-id="${id}" data-backend-url="${origin}"><\\/script>`;
 
       card.innerHTML = `
         <div class="flex justify-between items-center">
@@ -109,7 +104,7 @@ async function loadRestaurants() {
 }
 
 document.addEventListener("DOMContentLoaded", loadRestaurants);
-
 </script>
+
 </body>
 </html>
