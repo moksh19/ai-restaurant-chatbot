@@ -30,7 +30,7 @@ app.use("/admin", express.static(path.join(__dirname, "public/admin")));
 
 // Redirect root to admin dashboard
 app.get("/", (req, res) => {
-  res.redirect("/admin/index.html");
+  res.sendFile(path.join(__dirname, "public", "landing.html"));
 });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

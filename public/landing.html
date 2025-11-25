@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Restaurant Chatbot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-50">
+
+<div class="min-h-screen flex flex-col">
+
+  <!-- NAVBAR -->
+  <header class="border-b border-slate-800">
+    <div class="max-w-5xl mx-auto flex items-center justify-between py-4 px-4">
+      <div class="text-xl font-bold">AI Restaurant Chatbot</div>
+      <div class="flex gap-4 text-sm">
+        <a href="#demo" class="hover:underline">Live Demo</a>
+        <a href="#how" class="hover:underline">How it Works</a>
+        <a href="/admin/index.html" class="bg-emerald-500 text-slate-950 px-3 py-1 rounded text-sm font-semibold">
+          Go to Dashboard
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <main class="flex-1">
+    <section class="max-w-5xl mx-auto grid md:grid-cols-2 gap-10 py-12 px-4 items-center">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-bold mb-4">
+          Turn your menu into an AI chatbot in minutes.
+        </h1>
+        <p class="text-slate-300 mb-4">
+          Upload your menu as a PDF, image, or website link. Our system builds a smart chatbot
+          that can answer questions, suggest items, and link to your online ordering.
+        </p>
+        <ul class="text-slate-300 text-sm space-y-1 mb-6">
+          <li>• Import menu from screenshots, PDFs, or website URLs</li>
+          <li>• Edit items, prices, and images in a simple dashboard</li>
+          <li>• Copy-paste one line of code to embed on any website</li>
+        </ul>
+
+        <div class="flex flex-wrap gap-3">
+          <a href="/admin/index.html"
+             class="bg-emerald-500 text-slate-950 px-4 py-2 rounded font-semibold">
+            Open Admin Dashboard
+          </a>
+          <a href="#demo" class="text-emerald-400 underline">
+            See Live Demo ↓
+          </a>
+        </div>
+      </div>
+
+      <!-- DEMO BOX -->
+      <div id="demo" class="bg-slate-900/70 rounded-xl border border-slate-700 p-4">
+        <h2 class="text-lg font-semibold mb-2">Live Demo: Pizza & Pints</h2>
+        <p class="text-slate-300 text-sm mb-3">
+          Ask about pizzas, hours, or how to order. This widget is running on real menu data
+          from the admin panel.
+        </p>
+        <div class="border border-slate-700 rounded-lg h-96 relative overflow-hidden">
+          <!-- The widget will appear in the bottom-right of this page as usual -->
+          <div class="absolute inset-0 flex items-center justify-center text-slate-600 text-xs">
+            Chat widget is attached to the page (bottom-right).
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section id="how" class="border-t border-slate-800 bg-slate-900/40">
+      <div class="max-w-5xl mx-auto py-10 px-4">
+        <h2 class="text-2xl font-bold mb-4">How it works</h2>
+        <ol class="list-decimal list-inside space-y-2 text-slate-200 text-sm">
+          <li>Create a restaurant in the dashboard.</li>
+          <li>Import your menu from an image, PDF, or website URL.</li>
+          <li>Review and tweak items in the Menu Editor.</li>
+          <li>Copy the embed code from your restaurant card.</li>
+          <li>Paste it into your website’s HTML (or send it to your web developer).</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-slate-800 text-center py-4 text-xs text-slate-500">
+    Built for local restaurants. Powered by OpenAI.
+  </footer>
+
+</div>
+
+<!-- DEMO WIDGET: change id if your demo restaurant ID is different -->
+<script
+  src="https://ai-restaurant-chatbot.onrender.com/widget.js"
+  data-restaurant-id="pizza-pints"
+  data-backend-url="https://ai-restaurant-chatbot.onrender.com">
+</script>
+</body>
+</html>

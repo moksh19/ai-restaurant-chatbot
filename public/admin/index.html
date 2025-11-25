@@ -9,6 +9,7 @@
 
 <div class="max-w-4xl mx-auto mt-10 bg-white shadow rounded p-6">
   <h1 class="text-3xl font-bold mb-6">Restaurant Dashboard</h1>
+
   <div class="flex flex-wrap gap-3 mb-4">
     <button
       onclick="window.location.href='/admin/add.html'"
@@ -18,7 +19,6 @@
       <span>Add Restaurant</span>
     </button>
 
-    <!-- NEW: Download Backup button -->
     <button
       onclick="window.location.href='/admin/backup'"
       class="bg-gray-700 text-white px-4 py-2 rounded"
@@ -27,14 +27,13 @@
     </button>
   </div>
 
-
-  
-
   <h2 class="text-xl font-semibold mt-4 mb-2">Current Restaurants</h2>
   <div id="restaurantsList" class="space-y-3"></div>
 </div>
 
 <script>
+const BACKEND_URL = "https://ai-restaurant-chatbot.onrender.com";
+
 async function loadRestaurants() {
   const list = document.getElementById("restaurantsList");
   list.innerHTML = "Loading...";
@@ -91,7 +90,28 @@ async function loadRestaurants() {
             Import Menu From URL
           </a>
         </div>
+
+        <!-- Embed code -->
+        <details class="mt-4 bg-white border border-gray-200 rounded p-3">
+          <summary class="cursor-pointer text-sm font-semibold text-gray-800">
+            Embed Code (copy & paste into your website)
+          </summary>
+          <p class="text-xs text-gray-600 mt-2 mb-1">
+            Place this just before <code>&lt;/body&gt;</code> on your website.
+          </p>
+          <pre class="embed-snippet text-xs bg-gray-900 text-green-200 p-2 rounded overflow-x-auto"></pre>
+        </details>
       `;
+
+      // fill in the embed snippet text
+      const snippet = `<script
+  src="${BACKEND_URL}/widget.js"
+  data-restaurant-id="${id}"
+  data-backend-url="${BACKEND_URL}">
+</script>`;
+
+      const pre = card.querySelector(".embed-snippet");
+      pre.textContent = snippet;
 
       list.appendChild(card);
     });
