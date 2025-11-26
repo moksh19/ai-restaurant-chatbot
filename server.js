@@ -44,7 +44,10 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ---------------------- Restaurants store ----------------------
 const restaurantsFile = path.join(__dirname, "restaurants.json");
+const logsFile = path.join(__dirname, "chat-logs.jsonl");
+const backupsDir = path.join(__dirname, "backups");
 let restaurants = {};
+
 
 // Load restaurants from JSON (supports old array format)
 async function loadRestaurants() {
@@ -75,11 +78,25 @@ async function loadRestaurants() {
 
 async function saveRestaurants(data) {
   try {
-    await fs.writeFile(restaurantsFile, JSON.stringify(data, null, 2), "utf8");
+    const json = JSON.stringify(data, null, 2);
+
+    // 1) Save main file
+    await fs.writeFile(restaurantsFile, json, "utf8");
+
+    // 2) Also keep a daily backup
+    try {
+      await fs.mkdir(backupsDir, { recursive: true });
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const backupPath = path.join(backupsDir, `restaurants-${today}.json`);
+      await fs.writeFile(backupPath, json, "utf8");
+    } catch (backupErr) {
+      console.error("Error writing daily backup:", backupErr);
+    }
   } catch (err) {
     console.error("Error saving restaurants.json:", err);
   }
 }
+
 
 // ---------------------- Backup endpoint ----------------------
 app.get("/admin/backup", (req, res) => {
@@ -609,12 +626,24 @@ app.post("/admin/rescan-all", async (req, res) => {
   }
 });
 
+// Append a single chat log line (JSONL)
+async function appendChatLog(entry) {
+  try {
+    const line = JSON.stringify(entry) + "\n";
+    await fs.appendFile(logsFile, line, "utf8");
+  } catch (err) {
+    console.error("Error writing chat log:", err);
+  }
+}
+
+// ---------------------- Chatbot ----------------------
 // ---------------------- Chatbot ----------------------
 app.post("/chat", async (req, res) => {
+  let restaurant; // so we can use it in the catch as well
   try {
     const { restaurantId, message, history } = req.body;
 
-    const restaurant = restaurants[restaurantId];
+    restaurant = restaurants[restaurantId];
     if (!restaurant) {
       return res.status(404).json({ error: "Restaurant not found" });
     }
@@ -635,13 +664,23 @@ app.post("/chat", async (req, res) => {
         {
           role: "system",
           content: `
-You are a helpful AI assistant for a restaurant.
-Use ONLY this JSON data to answer questions:
+You are an AI host for this restaurant.
+
+Use ONLY the JSON data provided below to answer questions:
 
 ${context}
 
-If user asks about deals/promos, ONLY mention items from "activeOffers".
-If activeOffers is empty, say there are no current promotions.
+Rules:
+- Always be friendly and concise.
+- Start replies with the restaurant name when possible (e.g., "At Pizza & Pints, ...").
+- For hours, use the "hours" field. If a day or time is missing, say you're not fully sure and suggest calling the restaurant.
+- For menu questions, use the "menu" array. List a few relevant items with prices instead of dumping everything.
+- For deals/promos, ONLY use "activeOffers".
+  - If activeOffers is empty, clearly say there are no current promotions.
+- If online ordering links exist, encourage the user to use them.
+- If Google Maps / address is available, use it when they ask for directions.
+- NEVER invent medical, allergy, or safety advice. For those, always tell them to ask the staff directly.
+- Keep answers to about 3–8 short sentences unless the user asks for more detail.
 `,
         },
         ...(history || []),
@@ -649,12 +688,55 @@ If activeOffers is empty, say there are no current promotions.
       ],
     });
 
-    res.json({ reply: completion.choices[0].message.content });
+    const replyText = completion.choices[0].message.content;
+
+    // Log chat (we'll define appendChatLog below)
+    try {
+      await appendChatLog({
+        ts: new Date().toISOString(),
+        restaurantId,
+        userMessage: message,
+        reply: replyText,
+        activeOffersCount: activeOffers.length,
+        hasMenu: Array.isArray(restaurant.menu) && restaurant.menu.length > 0,
+        hasOffers: Array.isArray(restaurant.offers) && restaurant.offers.length > 0,
+        ip: req.ip || null,
+      });
+    } catch (logErr) {
+      console.error("Failed to write chat log:", logErr);
+    }
+
+    res.json({ reply: replyText });
   } catch (err) {
     console.error("Chat error:", err);
-    res.status(500).json({ error: "Chat failed" });
+
+    // Friendly fallback so customer still gets a response
+    let fallback = "Sorry, I'm having trouble answering right now.";
+
+    if (restaurant) {
+      const phone = restaurant.phone || "";
+      const site =
+        restaurant.googleMapsUrl ||
+        (restaurant.orderingLinks && restaurant.orderingLinks[0]?.url) ||
+        "";
+
+      if (phone && site) {
+        fallback += ` You can call us at ${phone} or visit ${site}.`;
+      } else if (phone) {
+        fallback += ` You can call the restaurant at ${phone}.`;
+      } else if (site) {
+        fallback += ` You can visit our website here: ${site}.`;
+      }
+    }
+
+    // Return 200 so widget doesn't break, but include an error flag
+    res.status(200).json({
+      reply: fallback,
+      error: "Chat failed internally",
+    });
   }
 });
+
 
 // ---------------------- Start server ----------------------
 async function start() {
